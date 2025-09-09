@@ -1,13 +1,11 @@
 """Base models and enums for Haunted."""
 
 from enum import Enum
-from datetime import datetime
-from typing import Optional
-from sqlmodel import SQLModel, Field
 
 
 class Priority(str, Enum):
     """Issue priority levels."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -16,6 +14,7 @@ class Priority(str, Enum):
 
 class IssueStatus(str, Enum):
     """Issue status."""
+
     OPEN = "open"
     IN_PROGRESS = "in_progress"
     BLOCKED = "blocked"
@@ -24,6 +23,7 @@ class IssueStatus(str, Enum):
 
 class WorkflowStage(str, Enum):
     """Workflow stages based on DEVELOPMENT_WORKFLOW.md."""
+
     PLAN = "plan"
     IMPLEMENT = "implement"
     UNIT_TEST = "unit_test"
@@ -35,6 +35,7 @@ class WorkflowStage(str, Enum):
 
 class PhaseStatus(str, Enum):
     """Phase status."""
+
     PLANNING = "planning"
     ACTIVE = "active"
     COMPLETED = "completed"
@@ -43,6 +44,7 @@ class PhaseStatus(str, Enum):
 
 class TaskStatus(str, Enum):
     """Task status."""
+
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
