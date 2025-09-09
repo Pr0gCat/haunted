@@ -1,10 +1,8 @@
-"""Claude Code SDK wrapper for processing issues without direct API key."""
+"""Claude Code CLI wrapper for processing issues using JSON output format."""
 
-import asyncio
 import json
-from typing import Dict, Any, Optional
-
-from claude_code_sdk import ClaudeSDKClient, ClaudeCodeOptions
+import subprocess
+from typing import Dict, Any
 
 from ..utils.logger import get_logger
 
@@ -12,384 +10,298 @@ logger = get_logger(__name__)
 
 
 class ClaudeCodeWrapper:
-    """Wrapper for Claude Code SDK - no API key required, uses local Claude Code authentication."""
-    
+    """Wrapper for Claude Code CLI - uses --output-format json for structured responses."""
+
     def __init__(self):
         """Initialize Claude Code wrapper."""
-        self.client = None
-        
+        self.claude_cmd = "claude"
+
     async def check_claude_availability(self) -> bool:
         """
-        Check if Claude Code SDK is available and user is logged in.
-        
+        Check if Claude Code CLI is available and user is authenticated.
+
         Returns:
-            True if Claude Code SDK is available and user is authenticated
+            True if Claude Code CLI is available and user is authenticated
         """
         try:
-            # 嘗試建立連線來測試可用性
-            async with ClaudeSDKClient() as client:
-                logger.info("Claude Code SDK is available and user is logged in")
+            # Test Claude CLI availability with a simple command
+            result = subprocess.run(
+                [self.claude_cmd, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode == 0:
+                logger.info("Claude Code CLI is available")
                 return True
-                
+            else:
+                logger.error(
+                    f"Claude CLI check failed with return code: {result.returncode}"
+                )
+                return False
+
         except Exception as e:
-            logger.error(f"Claude SDK check failed: {e}")
+            logger.error(f"Claude CLI check failed: {e}")
             return False
-    
-    async def analyze_and_plan(self, issue_dict: Dict[str, Any]) -> str:
+
+    async def analyze_and_plan(self, issue_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Analyze issue and create implementation plan using Claude Code SDK.
-        
+        Analyze issue and create implementation plan using Claude Code CLI.
+
         Args:
             issue_dict: Issue data as dictionary
-            
+
         Returns:
-            Implementation plan as string
+            Implementation plan as JSON dictionary
         """
         prompt = self._build_plan_prompt(issue_dict)
-        
+
         try:
-            response = await self._execute_claude_query(prompt, "You are an expert software architect analyzing issues and creating implementation plans.")
+            response = await self._execute_claude_query(
+                prompt,
+                "You are an expert software architect analyzing issues and creating implementation plans.",
+            )
             logger.info(f"Generated plan for issue {issue_dict.get('id', 'unknown')}")
             return response
-            
+
         except Exception as e:
-            logger.error(f"Plan generation failed for issue {issue_dict.get('id', 'unknown')}: {e}")
-            return f"Plan generation failed: {e}"
-    
-    async def implement_solution(self, issue_dict: Dict[str, Any]) -> str:
+            logger.error(
+                f"Plan generation failed for issue {issue_dict.get('id', 'unknown')}: {e}"
+            )
+            return {"error": f"Plan generation failed: {e}"}
+
+    async def implement_solution(self, issue_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Generate implementation using Claude Code SDK.
-        
+        Generate implementation using Claude Code CLI.
+
         Args:
             issue_dict: Issue data with plan
-            
+
         Returns:
-            Implementation details as string
+            Implementation details as JSON dictionary
         """
         prompt = self._build_implement_prompt(issue_dict)
-        
+
         try:
-            response = await self._execute_claude_query(prompt, "You are an expert software developer implementing solutions based on plans.")
-            logger.info(f"Generated implementation for issue {issue_dict.get('id', 'unknown')}")
+            response = await self._execute_claude_query(
+                prompt,
+                "You are an expert software developer implementing solutions based on plans.",
+            )
+            logger.info(
+                f"Generated implementation for issue {issue_dict.get('id', 'unknown')}"
+            )
             return response
-            
+
         except Exception as e:
-            logger.error(f"Implementation generation failed for issue {issue_dict.get('id', 'unknown')}: {e}")
-            return f"Implementation generation failed: {e}"
-    
-    async def generate_tests(self, issue_dict: Dict[str, Any]) -> str:
+            logger.error(
+                f"Implementation generation failed for issue {issue_dict.get('id', 'unknown')}: {e}"
+            )
+            return {"error": f"Implementation generation failed: {e}"}
+
+    async def generate_tests(self, issue_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Generate unit tests using Claude Code SDK.
-        
+        Generate unit tests using Claude Code CLI.
+
         Args:
             issue_dict: Issue data with implementation
-            
+
         Returns:
-            Test code as string
+            Test code as JSON dictionary
         """
         prompt = self._build_test_prompt(issue_dict)
-        
+
         try:
-            response = await self._execute_claude_query(prompt, "You are an expert in writing comprehensive unit tests.")
+            response = await self._execute_claude_query(
+                prompt, "You are an expert in writing comprehensive unit tests."
+            )
             logger.info(f"Generated tests for issue {issue_dict.get('id', 'unknown')}")
             return response
-            
+
         except Exception as e:
-            logger.error(f"Test generation failed for issue {issue_dict.get('id', 'unknown')}: {e}")
-            return f"Test generation failed: {e}"
-    
-    async def diagnose_issues(self, issue_dict: Dict[str, Any], error_log: str) -> str:
+            logger.error(
+                f"Test generation failed for issue {issue_dict.get('id', 'unknown')}: {e}"
+            )
+            return {"error": f"Test generation failed: {e}"}
+
+    async def diagnose_issues(
+        self, issue_dict: Dict[str, Any], error_log: str
+    ) -> Dict[str, Any]:
         """
-        Diagnose issues using Claude Code SDK.
-        
+        Diagnose issues using Claude Code CLI.
+
         Args:
             issue_dict: Issue data
             error_log: Error logs to analyze
-            
+
         Returns:
-            Diagnosis and fix suggestions
+            Diagnosis and fix suggestions as JSON dictionary
         """
         prompt = self._build_diagnose_prompt(issue_dict, error_log)
-        
+
         try:
-            response = await self._execute_claude_query(prompt, "You are an expert in debugging and problem diagnosis.")
-            logger.info(f"Generated diagnosis for issue {issue_dict.get('id', 'unknown')}")
+            response = await self._execute_claude_query(
+                prompt, "You are an expert in debugging and problem diagnosis."
+            )
+            logger.info(
+                f"Generated diagnosis for issue {issue_dict.get('id', 'unknown')}"
+            )
             return response
-            
+
         except Exception as e:
-            logger.error(f"Diagnosis failed for issue {issue_dict.get('id', 'unknown')}: {e}")
-            return f"Diagnosis failed: {e}"
-    
-    async def _execute_claude_query(self, prompt: str, system_prompt: str = "") -> str:
+            logger.error(
+                f"Diagnosis failed for issue {issue_dict.get('id', 'unknown')}: {e}"
+            )
+            return {"error": f"Diagnosis failed: {e}"}
+
+    async def _execute_claude_query(
+        self, prompt: str, system_prompt: str = ""
+    ) -> Dict[str, Any]:
         """
-        Execute a query using Claude Code SDK.
-        
+        Execute a query using Claude Code CLI with JSON output format.
+
         Args:
             prompt: The prompt to send to Claude
             system_prompt: System prompt for context
-            
+
         Returns:
-            Claude's response as string
+            Claude's response as parsed JSON dictionary
         """
         try:
-            logger.info(f"Executing Claude Code SDK query:")
+            logger.info("Executing Claude Code CLI query:")
             logger.info(f"System prompt: {system_prompt}")
             logger.info(f"User prompt: {prompt}")
-            
+
             # Print prompt to console
-            print("\n" + "="*60)
-            print("📝 PROMPT TO CLAUDE CODE")
-            print("="*60)
+            print("\n" + "=" * 60)
+            print("📝 PROMPT TO CLAUDE CODE CLI")
+            print("=" * 60)
             if system_prompt:
                 print(f"🎯 SYSTEM: {system_prompt}")
-                print("-"*60)
+                print("-" * 60)
             print(f"💬 USER: {prompt}")
-            print("="*60)
-            
-            options = ClaudeCodeOptions(
-                system_prompt=system_prompt,
-                max_turns=1
+            print("=" * 60)
+
+            # Build Claude CLI command with JSON output format
+            cmd = [
+                self.claude_cmd,
+                "--print",  # Non-interactive mode
+                "--output-format",
+                "json",  # Request JSON output
+                prompt,
+            ]
+
+            # Add system prompt if provided
+            if system_prompt:
+                cmd.extend(["--append-system-prompt", system_prompt])
+
+            # Execute Claude CLI command
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
+                encoding="utf-8",
             )
-            
-            response_text = ""
-            
-            async with ClaudeSDKClient(options=options) as client:
-                # Send the query
-                await client.query(prompt)
-                
-                # Wait for and collect the complete response
-                complete = False
-                async for message in client.receive_response():
-                    if hasattr(message, 'content'):
-                        for block in message.content:
-                            if hasattr(block, 'text'):
-                                response_text += block.text
-                    
-                    # Check if response is complete
-                    if hasattr(message, 'type') and message.type == 'message':
-                        if hasattr(message, 'stop_reason') and message.stop_reason:
-                            complete = True
-                            break
-                
-                # If we don't have a completion signal, the response should be complete
-                if not complete:
-                    logger.info("Response completed without explicit stop signal")
-            
-            if response_text.strip():
-                logger.info(f"Claude SDK responded with {len(response_text)} characters")
-                
-                # Print Claude Code response to console
-                print("\n" + "="*60)
-                print("🤖 CLAUDE CODE RESPONSE")
-                print("="*60)
-                print(response_text.strip())
-                print("="*60 + "\n")
-                
-                # Try to parse as JSON and validate
-                try:
-                    parsed_json = self._extract_and_parse_json(response_text.strip())
-                    if parsed_json:
-                        print("✅ JSON Response Successfully Parsed")
-                        print("="*60)
-                        print(json.dumps(parsed_json, indent=2))
-                        print("="*60 + "\n")
-                        return json.dumps(parsed_json)
-                except Exception as json_error:
-                    print(f"⚠️ JSON Parse Error: {json_error}")
-                    print("Returning raw response...")
-                
-                return response_text.strip()
-            else:
-                return "Claude provided an empty response."
-                
-        except Exception as e:
-            logger.error(f"Error executing Claude SDK query: {e}")
-            return f"Error executing Claude SDK query: {e}"
-    
-    def _extract_and_parse_json(self, response_text: str) -> Optional[Dict[str, Any]]:
-        """
-        Extract and parse JSON from Claude's response.
-        
-        Args:
-            response_text: Raw response text from Claude
-            
-        Returns:
-            Parsed JSON object or None if parsing fails
-        """
-        # Try to find JSON in code blocks first
-        import re
-        
-        # Look for JSON in code blocks
-        json_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
-        matches = re.findall(json_pattern, response_text, re.DOTALL)
-        
-        if matches:
-            for match in matches:
-                try:
-                    return json.loads(match)
-                except json.JSONDecodeError:
-                    continue
-        
-        # Try to parse the entire response as JSON
-        try:
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            pass
-        
-        # Try to extract JSON-like content
-        # Look for content between { and }
-        json_start = response_text.find('{')
-        json_end = response_text.rfind('}') + 1
-        
-        if json_start != -1 and json_end > json_start:
+
+            if result.returncode != 0:
+                logger.error(f"Claude CLI failed with return code {result.returncode}")
+                logger.error(f"stderr: {result.stderr}")
+                raise Exception(f"Claude CLI failed: {result.stderr}")
+
+            # Parse JSON response
             try:
-                potential_json = response_text[json_start:json_end]
-                return json.loads(potential_json)
-            except json.JSONDecodeError:
-                pass
-        
-        return None
-    
+                response_json = json.loads(result.stdout)
+
+                # Print Claude Code response to console
+                print("\n" + "=" * 60)
+                print("🤖 CLAUDE CODE CLI JSON RESPONSE")
+                print("=" * 60)
+                print(json.dumps(response_json, indent=2))
+                print("=" * 60 + "\n")
+
+                logger.info(
+                    f"Claude CLI responded with JSON: {len(result.stdout)} characters"
+                )
+                return response_json
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Claude CLI JSON response: {e}")
+                logger.error(f"Raw output: {result.stdout}")
+                raise Exception(f"Invalid JSON response from Claude CLI: {e}")
+
+        except Exception as e:
+            logger.error(f"Error executing Claude CLI query: {e}")
+            raise Exception(f"Error executing Claude CLI query: {e}")
+
     def _build_plan_prompt(self, issue_dict: Dict[str, Any]) -> str:
-        """Build planning prompt for Claude Code SDK."""
+        """Build planning prompt for Claude Code CLI."""
         return f"""# Issue Analysis and Implementation Plan
 
 ## Issue Details
-**Title**: {issue_dict.get('title', 'No title')}
-**Description**: {issue_dict.get('description', 'No description')}
-**Priority**: {issue_dict.get('priority', 'Unknown')}
+**Title**: {issue_dict.get("title", "No title")}
+**Description**: {issue_dict.get("description", "No description")}
+**Priority**: {issue_dict.get("priority", "Unknown")}
 
 ## Task
-Please analyze this issue and create a detailed implementation plan. 
+Please analyze this issue and create a detailed implementation plan. Include:
 
-**IMPORTANT: Please respond with a valid JSON object in the following format:**
+1. **Requirements Analysis**: List the key requirements and functional needs
+2. **Solution Design**: Describe the architecture/approach, edge cases to consider, and any constraints
+3. **Implementation Strategy**: Specify which files need to be created or modified, the implementation steps, and any dependencies
+4. **Risk Assessment**: Identify potential risks and mitigation strategies
 
-```json
-{{
-  "requirements_analysis": [
-    "requirement 1",
-    "requirement 2"
-  ],
-  "solution_design": {{
-    "architecture": "description of the architecture/approach",
-    "edge_cases": ["edge case 1", "edge case 2"],
-    "constraints": ["constraint 1", "constraint 2"]
-  }},
-  "implementation_strategy": {{
-    "files_to_create": ["file1.html", "file2.js"],
-    "files_to_modify": ["existing_file.css"],
-    "steps": [
-      "Step 1: description",
-      "Step 2: description"
-    ],
-    "dependencies": ["dependency 1", "dependency 2"]
-  }},
-  "risk_assessment": {{
-    "risks": ["risk 1", "risk 2"],
-    "mitigation_strategies": ["strategy 1", "strategy 2"]
-  }}
-}}
-```
-
-Please provide only the JSON response, no additional text before or after."""
+Provide a comprehensive analysis that will guide the implementation of this issue."""
 
     def _build_implement_prompt(self, issue_dict: Dict[str, Any]) -> str:
-        """Build implementation prompt for Claude Code SDK."""
-        plan = issue_dict.get('plan', 'No plan available')
-        
+        """Build implementation prompt for Claude Code CLI."""
+        plan = issue_dict.get("plan", "No plan available")
+
         return f"""# Implementation Task
 
 ## Issue Details
-**Title**: {issue_dict.get('title', 'No title')}
-**Description**: {issue_dict.get('description', 'No description')}
+**Title**: {issue_dict.get("title", "No title")}
+**Description**: {issue_dict.get("description", "No description")}
 
 ## Implementation Plan
 {plan}
 
 ## Task
-Based on the above plan, please provide detailed implementation guidance.
+Based on the above plan, please provide detailed implementation guidance. Include:
 
-**IMPORTANT: Please respond with a valid JSON object in the following format:**
+1. **Files**: List all files that need to be created or modified, including their complete content and purpose
+2. **Code Structure**: Describe the main components and how files are organized
+3. **Implementation Notes**: Provide implementation details and best practices
+4. **Integration Points**: Explain how this integrates with existing code and any configuration changes needed
+5. **Next Steps**: Outline the steps needed to complete the implementation
 
-```json
-{{
-  "files": [
-    {{
-      "path": "path/to/file.ext",
-      "action": "create|modify",
-      "content": "complete file content here",
-      "description": "what this file does"
-    }}
-  ],
-  "code_structure": {{
-    "main_components": ["component 1", "component 2"],
-    "file_organization": "description of how files are organized"
-  }},
-  "implementation_notes": [
-    "note 1 about implementation",
-    "note 2 about best practices"
-  ],
-  "integration_points": [
-    "how this integrates with existing code",
-    "configuration changes needed"
-  ],
-  "next_steps": [
-    "step 1",
-    "step 2"
-  ]
-}}
-```
-
-Please provide only the JSON response with complete, working code in the files array."""
+Provide complete, working code for all files mentioned in the implementation."""
 
     def _build_test_prompt(self, issue_dict: Dict[str, Any]) -> str:
-        """Build testing prompt for Claude Code SDK."""
+        """Build testing prompt for Claude Code CLI."""
         return f"""# Unit Test Generation
 
 ## Issue Details
-**Title**: {issue_dict.get('title', 'No title')}
-**Description**: {issue_dict.get('description', 'No description')}
+**Title**: {issue_dict.get("title", "No title")}
+**Description**: {issue_dict.get("description", "No description")}
 
 ## Task
-Please generate comprehensive unit tests for the implementation of this issue.
+Please generate comprehensive unit tests for the implementation of this issue. Include:
 
-**IMPORTANT: Please respond with a valid JSON object in the following format:**
+1. **Test Files**: Create complete test files with runnable test code, specifying the testing framework and what each file covers
+2. **Test Coverage**: Cover happy path scenarios, edge cases, and error conditions
+3. **Setup Requirements**: List any requirements needed to run the tests
+4. **Run Instructions**: Provide clear instructions on how to run the tests and expected commands
 
-```json
-{{
-  "test_files": [
-    {{
-      "path": "path/to/test_file.js",
-      "content": "complete test file content",
-      "framework": "testing framework used",
-      "description": "what this test file covers"
-    }}
-  ],
-  "test_coverage": {{
-    "happy_path_scenarios": ["scenario 1", "scenario 2"],
-    "edge_cases": ["edge case 1", "edge case 2"],
-    "error_conditions": ["error 1", "error 2"]
-  }},
-  "setup_requirements": [
-    "requirement 1",
-    "requirement 2"
-  ],
-  "run_instructions": [
-    "how to run the tests",
-    "expected test commands"
-  ]
-}}
-```
-
-Please provide only the JSON response with complete, runnable test code."""
+Ensure all test code is complete and runnable."""
 
     def _build_diagnose_prompt(self, issue_dict: Dict[str, Any], error_log: str) -> str:
-        """Build diagnosis prompt for Claude Code SDK."""
+        """Build diagnosis prompt for Claude Code CLI."""
         return f"""# Issue Diagnosis
 
 ## Issue Details
-**Title**: {issue_dict.get('title', 'No title')}
-**Description**: {issue_dict.get('description', 'No description')}
+**Title**: {issue_dict.get("title", "No title")}
+**Description**: {issue_dict.get("description", "No description")}
 
 ## Error Log
 ```
@@ -397,152 +309,111 @@ Please provide only the JSON response with complete, runnable test code."""
 ```
 
 ## Task
-Please analyze the error log and provide diagnosis.
+Please analyze the error log and provide comprehensive diagnosis. Include:
 
-**IMPORTANT: Please respond with a valid JSON object in the following format:**
+1. **Root Cause Analysis**: Identify the primary cause, explain why the error occurred, and classify the error type
+2. **Impact Assessment**: Describe the scope of the problem, identify affected components, and assess severity level
+3. **Fix Recommendations**: Provide immediate steps to resolve the issue, specify needed code changes, and suggest preventive measures
+4. **Testing Strategy**: Recommend verification tests and regression prevention measures
 
-```json
-{{
-  "root_cause": {{
-    "primary_cause": "description of primary cause",
-    "explanation": "why the error occurred",
-    "error_type": "type of error"
-  }},
-  "impact_assessment": {{
-    "scope": "scope of the problem",
-    "affected_components": ["component 1", "component 2"],
-    "severity": "low|medium|high|critical"
-  }},
-  "fix_recommendations": {{
-    "immediate_steps": ["step 1", "step 2"],
-    "code_changes": [
-      {{
-        "file": "path/to/file",
-        "change": "description of change needed"
-      }}
-    ],
-    "preventive_measures": ["measure 1", "measure 2"]
-  }},
-  "testing_strategy": {{
-    "verification_tests": ["test 1", "test 2"],
-    "regression_prevention": ["prevention 1", "prevention 2"]
-  }}
-}}
-```
+Provide actionable recommendations with specific steps to resolve the issue."""
 
-Please provide only the JSON response with actionable recommendations."""
-    
-    async def fix_test_failures(self, issue_dict: Dict[str, Any]) -> str:
+    async def fix_test_failures(self, issue_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Fix test failures using Claude Code SDK.
-        
+        Fix test failures using Claude Code CLI.
+
         Args:
             issue_dict: Issue data with test failure information
-            
+
         Returns:
-            Fix result as string
+            Fix result as JSON dictionary
         """
         prompt = self._build_fix_prompt(issue_dict)
-        
+
         try:
-            response = await self._execute_claude_query(prompt, "You are an expert in debugging and fixing failing tests.")
+            response = await self._execute_claude_query(
+                prompt, "You are an expert in debugging and fixing failing tests."
+            )
             logger.info(f"Generated fix for issue {issue_dict.get('id', 'unknown')}")
             return response
-            
+
         except Exception as e:
-            logger.error(f"Fix generation failed for issue {issue_dict.get('id', 'unknown')}: {e}")
-            return f"Fix generation failed: {e}"
-    
-    async def run_integration_tests(self, issue_dict: Dict[str, Any]) -> str:
+            logger.error(
+                f"Fix generation failed for issue {issue_dict.get('id', 'unknown')}: {e}"
+            )
+            return {"error": f"Fix generation failed: {e}"}
+
+    async def run_integration_tests(self, issue_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Run integration tests using Claude Code SDK.
-        
+        Run integration tests using Claude Code CLI.
+
         Args:
             issue_dict: Issue data
-            
+
         Returns:
-            Integration test results as string
+            Integration test results as JSON dictionary
         """
         prompt = self._build_integration_test_prompt(issue_dict)
-        
+
         try:
-            response = await self._execute_claude_query(prompt, "You are an expert in integration testing.")
-            logger.info(f"Ran integration tests for issue {issue_dict.get('id', 'unknown')}")
+            response = await self._execute_claude_query(
+                prompt, "You are an expert in integration testing."
+            )
+            logger.info(
+                f"Ran integration tests for issue {issue_dict.get('id', 'unknown')}"
+            )
             return response
-            
+
         except Exception as e:
-            logger.error(f"Integration testing failed for issue {issue_dict.get('id', 'unknown')}: {e}")
-            return f"Integration testing failed: {e}"
-    
+            logger.error(
+                f"Integration testing failed for issue {issue_dict.get('id', 'unknown')}: {e}"
+            )
+            return {"error": f"Integration testing failed: {e}"}
+
     def _build_fix_prompt(self, issue_dict: Dict[str, Any]) -> str:
-        """Build fix prompt for Claude Code SDK."""
+        """Build fix prompt for Claude Code CLI."""
         return f"""# Test Failure Fix
         
 ## Issue Details
-**Title**: {issue_dict.get('title', 'No title')}
-**Description**: {issue_dict.get('description', 'No description')}
+**Title**: {issue_dict.get("title", "No title")}
+**Description**: {issue_dict.get("description", "No description")}
 
 ## Implementation
-{issue_dict.get('implementation', 'No implementation available')}
+{issue_dict.get("implementation", "No implementation available")}
 
 ## Test Results
-{issue_dict.get('tests', 'No test results available')}
+{issue_dict.get("tests", "No test results available")}
 
 ## Task
 The unit tests are failing. Please analyze the failures and provide fixes:
 
-1. **Failure Analysis**
-   - Identify specific test failures
-   - Understand why tests are failing
+1. **Failure Analysis**: Identify specific test failures and understand why they're failing
+2. **Root Cause**: Determine what in the implementation is causing failures and identify logic errors or missing functionality
+3. **Fix Implementation**: Provide corrected code that addresses all test failures while maintaining existing functionality
+4. **Verification**: Explain how the fixes resolve the issues and suggest additional tests if needed
 
-2. **Root Cause**
-   - Determine what in the implementation is causing failures
-   - Identify logic errors or missing functionality
+Provide specific code fixes that will make the tests pass."""
 
-3. **Fix Implementation**
-   - Provide corrected code
-   - Ensure fixes address all test failures
-   - Maintain existing functionality
-
-4. **Verification**
-   - Explain how the fixes resolve the issues
-   - Suggest additional tests if needed
-
-Please provide specific code fixes that will make the tests pass.
-"""
-    
     def _build_integration_test_prompt(self, issue_dict: Dict[str, Any]) -> str:
-        """Build integration test prompt for Claude Code SDK."""
+        """Build integration test prompt for Claude Code CLI."""
         return f"""# Integration Test Execution
         
 ## Issue Details
-**Title**: {issue_dict.get('title', 'No title')}
-**Description**: {issue_dict.get('description', 'No description')}
+**Title**: {issue_dict.get("title", "No title")}
+**Description**: {issue_dict.get("description", "No description")}
 
 ## Implementation
-{issue_dict.get('implementation', 'No implementation available')}
+{issue_dict.get("implementation", "No implementation available")}
 
 ## Unit Tests
-{issue_dict.get('tests', 'No unit tests available')}
+{issue_dict.get("tests", "No unit tests available")}
 
 ## Task
 Please run integration tests for this implementation:
 
-1. **System Integration**
-   - Test integration with existing components
-   - Verify system-wide functionality
+1. **System Integration**: Test integration with existing components and verify system-wide functionality
+2. **End-to-End Testing**: Test complete workflows and verify user scenarios work correctly
+3. **Performance Testing**: Check performance characteristics and identify potential bottlenecks
+4. **Compatibility Testing**: Test with different environments and verify backward compatibility
 
-2. **End-to-End Testing**
-   - Test complete workflows
-   - Verify user scenarios work correctly
-
-3. **Performance Testing**
-   - Check performance characteristics
-   - Identify potential bottlenecks
-
-4. **Compatibility Testing**
-   - Test with different environments
-   - Verify backward compatibility
-
-Please provide comprehensive integration test results and identify any issues.
-"""
+Provide comprehensive integration test results and identify any issues."""
