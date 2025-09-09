@@ -46,14 +46,30 @@ def init():
             console.print("[yellow]Haunted is already initialized in this project.[/yellow]")
             return
         
-        # Verify we're in a git repository
+        # Check if git repository exists, initialize if not
         try:
             git_manager = GitManager()
             console.print(f"[green]✓[/green] Git repository detected: {git_manager.get_current_branch()}")
         except Exception as e:
-            console.print(f"[red]✗[/red] Not a Git repository: {e}")
-            console.print("Please run 'git init' first.")
-            return
+            console.print(f"[yellow]⚠[/yellow] Not a Git repository. Initializing git...")
+            try:
+                # Initialize git repository using GitPython
+                from git import Repo
+                repo = Repo.init(".")
+                console.print("[green]✓[/green] Git repository initialized")
+                
+                # Create initial commit if repository is empty
+                if not repo.heads:
+                    # Create an initial commit to establish main branch
+                    repo.index.commit("Initial commit")
+                    console.print("[green]✓[/green] Created initial commit")
+                
+                # Try to create GitManager again
+                git_manager = GitManager()
+                console.print(f"[green]✓[/green] Now on branch: {git_manager.get_current_branch()}")
+            except Exception as init_error:
+                console.print(f"[red]✗[/red] Failed to initialize git: {init_error}")
+                return
         
         # Check Claude Code CLI availability
         console.print("[cyan]Checking Claude Code CLI...[/cyan]")
