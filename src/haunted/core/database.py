@@ -7,7 +7,7 @@ from sqlmodel import SQLModel, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from ..models import (
+from haunted.models import (
     Issue,
     Task,
     Phase,
@@ -17,7 +17,7 @@ from ..models import (
     IssueStatus,
     WorkflowStage,
 )
-from ..utils.logger import get_logger
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -168,6 +168,7 @@ class DatabaseManager:
             issue_id = issue.id
             issue.branch_name = f"issue/{issue_id}"
             session.add(issue)
+            await session.commit()  # Commit the changes
 
         logger.info(f"Created issue: {title}")
 
@@ -185,10 +186,29 @@ class DatabaseManager:
             "updated_at": datetime.now(),
         }
 
-    async def get_issue(self, issue_id: int) -> Optional[Issue]:
+    async def get_issue(self, issue_id: int) -> Optional[dict]:
         """Get issue by ID."""
         async with self.get_session() as session:
-            return await session.get(Issue, issue_id)
+            issue = await session.get(Issue, issue_id)
+            if not issue:
+                return None
+            
+            # Return as dictionary to avoid session binding issues
+            return {
+                "id": issue.id,
+                "title": issue.title,
+                "description": issue.description,
+                "priority": issue.priority,
+                "status": issue.status,
+                "workflow_stage": issue.workflow_stage,
+                "phase_id": issue.phase_id,
+                "branch_name": issue.branch_name,
+                "created_at": issue.created_at,
+                "updated_at": issue.updated_at,
+                "plan": issue.plan,
+                "diagnosis_log": issue.diagnosis_log,
+                "iteration_count": issue.iteration_count,
+            }
 
     async def update_issue(self, issue: Issue) -> Issue:
         """Update existing issue."""
@@ -196,6 +216,7 @@ class DatabaseManager:
 
         async with self.get_session() as session:
             session.add(issue)
+            await session.commit()
 
         return issue
 

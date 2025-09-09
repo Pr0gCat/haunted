@@ -5,11 +5,11 @@ import signal
 from typing import List, Dict, Any
 from datetime import datetime
 
-from ..core.workflow import WorkflowEngine
-from ..core.database import DatabaseManager
-from ..core.git_manager import GitManager
-from ..utils.config import HauntedConfig
-from ..utils.logger import get_logger
+from haunted.core.workflow import WorkflowEngine
+from haunted.core.database import DatabaseManager
+from haunted.core.git_manager import GitManager
+from haunted.utils.config import HauntedConfig
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -149,6 +149,7 @@ class HauntedDaemonUpdated:
                 issues = await self.db_manager.list_issues()
                 logger.info(f"Scanner found {len(issues)} open issues")
 
+                issues_queued = 0
                 for issue_dict in issues:
                     issue_id = issue_dict["id"]
                     stage = issue_dict.get("workflow_stage", "unknown")
@@ -175,6 +176,16 @@ class HauntedDaemonUpdated:
                     # Add to queue
                     await self.issue_queue.put(issue_dict)
                     logger.info(f"✓ Queued issue {issue_id}: {issue_dict['title']}")
+                    issues_queued += 1
+
+                # Check for auto-exit condition
+                if (self.config.daemon.auto_exit_when_idle and 
+                    issues_queued == 0 and 
+                    len(self.active_issues) == 0 and 
+                    self.issue_queue.empty()):
+                    logger.info("Auto-exit triggered: No more issues to process")
+                    await self.stop()
+                    return
 
                 # Wait before next scan
                 logger.info(

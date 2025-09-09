@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from sqlmodel import SQLModel, Field
 
-from .base import TaskStatus
+from haunted.models.base import TaskStatus
 
 
 class Task(SQLModel, table=True):

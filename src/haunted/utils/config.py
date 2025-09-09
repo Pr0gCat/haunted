@@ -6,7 +6,7 @@ import yaml
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-from .logger import get_logger
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -36,6 +36,7 @@ class DaemonConfig(BaseModel):
 
     scan_interval: int = Field(default=30)  # seconds
     max_iterations: int = Field(default=3)
+    auto_exit_when_idle: bool = Field(default=False)  # Exit when no more issues to process
 
 
 class GitConfig(BaseModel):

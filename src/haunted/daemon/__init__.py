@@ -1,5 +1,5 @@
 """Daemon service package for Haunted."""
 
-from .service import HauntedDaemon
+from haunted.daemon.service import HauntedDaemon
 
 __all__ = ["HauntedDaemon"]

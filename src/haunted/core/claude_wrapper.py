@@ -4,7 +4,7 @@ import json
 import subprocess
 from typing import Dict, Any
 
-from ..utils.logger import get_logger
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

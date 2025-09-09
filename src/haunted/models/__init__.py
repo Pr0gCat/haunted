@@ -1,17 +1,17 @@
 """SQLModel data models for Haunted."""
 
-from .base import (
+from haunted.models.base import (
     Priority,
     IssueStatus,
     WorkflowStage,
     PhaseStatus,
     TaskStatus,
 )
-from .phase import Phase
-from .issue import Issue
-from .task import Task
-from .comment import Comment
-from .test_result import TestResult, TestType, TestStatus
+from haunted.models.phase import Phase
+from haunted.models.issue import Issue
+from haunted.models.task import Task
+from haunted.models.comment import Comment
+from haunted.models.test_result import TestResult, TestType, TestStatus
 
 __all__ = [
     # Enums

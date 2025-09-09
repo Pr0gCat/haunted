@@ -7,7 +7,7 @@ from sqlmodel import SQLModel, Field
 if TYPE_CHECKING:
     pass
 
-from .base import PhaseStatus
+from haunted.models.base import PhaseStatus
 
 
 class Phase(SQLModel, table=True):

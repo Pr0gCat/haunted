@@ -4,12 +4,12 @@ import asyncio
 from typing import Dict, Callable, Any, TYPE_CHECKING
 from datetime import datetime
 
-from ..models import WorkflowStage, IssueStatus
-from ..utils.logger import get_logger
-from .claude_wrapper import ClaudeCodeWrapper
+from haunted.models import WorkflowStage, IssueStatus
+from haunted.utils.logger import get_logger
+from haunted.core.claude_wrapper import ClaudeCodeWrapper
 
 if TYPE_CHECKING:
-    from .database import DatabaseManager
+    from haunted.core.database import DatabaseManager
 
 logger = get_logger(__name__)
 
@@ -98,16 +98,88 @@ class WorkflowEngine:
                 issue_dict["updated_at"] = datetime.now()
                 issue_dict["iteration_count"] += 1
 
+                # Save changes to database
+                try:
+                    # Create Issue object for database update
+                    from haunted.models.issue import Issue
+                    issue_obj = Issue(
+                        id=issue_dict["id"],
+                        title=issue_dict["title"],
+                        description=issue_dict["description"],
+                        priority=issue_dict["priority"],
+                        status=issue_dict["status"],
+                        workflow_stage=issue_dict["workflow_stage"],
+                        phase_id=issue_dict.get("phase_id"),
+                        branch_name=issue_dict["branch_name"],
+                        plan=issue_dict.get("plan"),
+                        diagnosis_log=issue_dict.get("diagnosis_log"),
+                        iteration_count=issue_dict["iteration_count"],
+                        created_at=issue_dict["created_at"],
+                        updated_at=issue_dict["updated_at"]
+                    )
+                    await self.db.update_issue(issue_obj)
+                    logger.info(f"Updated issue {issue_dict['id']} to stage {next_stage.value}")
+                except Exception as db_error:
+                    logger.error(f"Failed to update issue {issue_dict['id']} in database: {db_error}")
+
                 # Small delay between stages
                 await asyncio.sleep(1)
 
             logger.info(f"Workflow completed for issue {issue_dict['id']}")
+            # Final database update for completed workflow
+            try:
+                from haunted.models.issue import Issue
+                issue_obj = Issue(
+                    id=issue_dict["id"],
+                    title=issue_dict["title"],
+                    description=issue_dict["description"],
+                    priority=issue_dict["priority"],
+                    status=issue_dict["status"],
+                    workflow_stage=issue_dict["workflow_stage"],
+                    phase_id=issue_dict.get("phase_id"),
+                    branch_name=issue_dict["branch_name"],
+                    plan=issue_dict.get("plan"),
+                    diagnosis_log=issue_dict.get("diagnosis_log"),
+                    iteration_count=issue_dict["iteration_count"],
+                    created_at=issue_dict["created_at"],
+                    updated_at=issue_dict["updated_at"]
+                )
+                await self.db.update_issue(issue_obj)
+                logger.info(f"Final update for completed issue {issue_dict['id']}")
+            except Exception as db_error:
+                logger.error(f"Failed final update for issue {issue_dict['id']}: {db_error}")
+            
             return issue_dict
 
         except Exception as e:
             logger.error(f"Workflow error for issue {issue_dict['id']}: {e}")
             issue_dict["status"] = IssueStatus.BLOCKED.value
             issue_dict["workflow_stage"] = WorkflowStage.DONE.value
+            issue_dict["updated_at"] = datetime.now()
+            
+            # Update database for blocked issue
+            try:
+                from haunted.models.issue import Issue
+                issue_obj = Issue(
+                    id=issue_dict["id"],
+                    title=issue_dict["title"],
+                    description=issue_dict["description"],
+                    priority=issue_dict["priority"],
+                    status=issue_dict["status"],
+                    workflow_stage=issue_dict["workflow_stage"],
+                    phase_id=issue_dict.get("phase_id"),
+                    branch_name=issue_dict["branch_name"],
+                    plan=issue_dict.get("plan"),
+                    diagnosis_log=issue_dict.get("diagnosis_log"),
+                    iteration_count=issue_dict["iteration_count"],
+                    created_at=issue_dict["created_at"],
+                    updated_at=issue_dict["updated_at"]
+                )
+                await self.db.update_issue(issue_obj)
+                logger.info(f"Updated blocked issue {issue_dict['id']}")
+            except Exception as db_error:
+                logger.error(f"Failed to update blocked issue {issue_dict['id']}: {db_error}")
+            
             return issue_dict
 
     async def _plan_stage(self, issue_dict: Dict[str, Any]) -> WorkflowStage:

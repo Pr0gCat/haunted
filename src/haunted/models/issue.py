@@ -7,7 +7,7 @@ from sqlmodel import SQLModel, Field
 if TYPE_CHECKING:
     pass
 
-from .base import Priority, IssueStatus, WorkflowStage
+from haunted.models.base import Priority, IssueStatus, WorkflowStage
 
 
 class Issue(SQLModel, table=True):

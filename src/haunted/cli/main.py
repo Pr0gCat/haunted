@@ -7,11 +7,12 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
-from ..utils.config import get_config_manager, load_config
-from ..utils.logger import setup_logging, get_logger
-from ..core.database import DatabaseManager
-from ..core.git_manager import GitManager
-from ..models import WorkflowStage
+from haunted import __version__
+from haunted.utils.config import get_config_manager, load_config
+from haunted.utils.logger import setup_logging, get_logger
+from haunted.core.database import DatabaseManager
+from haunted.core.git_manager import GitManager
+from haunted.models import WorkflowStage
 
 console = Console()
 logger = get_logger(__name__)
@@ -20,6 +21,7 @@ logger = get_logger(__name__)
 @click.group()
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.option("--log-file", help="Log file path")
+@click.version_option(version=__version__, prog_name="Haunted")
 @click.pass_context
 def cli(ctx, verbose, log_file):
     """Haunted - AI-powered development with automated workflow management."""
@@ -61,11 +63,73 @@ def init():
                 repo = Repo.init(".")
                 console.print("[green]✓[/green] Git repository initialized")
 
-                # Create initial commit if repository is empty
+                # Create initial commit and main branch if repository is empty
                 if not repo.heads:
-                    # Create an initial commit to establish main branch
-                    repo.index.commit("Initial commit")
-                    console.print("[green]✓[/green] Created initial commit")
+                    # Create a .gitignore file first
+                    gitignore_content = """# Haunted specific
+.haunted/
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+"""
+                    with open(".gitignore", "w") as f:
+                        f.write(gitignore_content)
+                    
+                    # Add .gitignore to the index
+                    repo.index.add([".gitignore"])
+                    
+                    # Create initial commit to establish main branch
+                    repo.index.commit("Initial commit\n\n🤖 Generated with [Claude Code](https://claude.ai/code)")
+                    console.print("[green]✓[/green] Created initial commit with .gitignore")
+                    
+                    # Ensure we're on main branch (rename if needed)
+                    if repo.active_branch.name != "main":
+                        current_branch = repo.active_branch
+                        main_branch = repo.create_head("main", commit=current_branch.commit)
+                        main_branch.checkout()
+                        console.print("[green]✓[/green] Created and switched to 'main' branch")
+                    else:
+                        console.print("[green]✓[/green] Already on 'main' branch")
 
                 # Try to create GitManager again
                 git_manager = GitManager()
@@ -78,7 +142,7 @@ def init():
 
         # Check Claude Code CLI availability
         console.print("[cyan]Checking Claude Code CLI...[/cyan]")
-        from ..core.claude_wrapper import ClaudeCodeWrapper
+        from haunted.core.claude_wrapper import ClaudeCodeWrapper
 
         wrapper = ClaudeCodeWrapper()
 
@@ -121,7 +185,8 @@ def init():
 
 @cli.command()
 @click.option("--background", "-b", is_flag=True, help="Run daemon in background")
-def start(background):
+@click.option("--auto-exit", is_flag=True, help="Exit automatically when no more issues to process")
+def start(background, auto_exit):
     """Start the Haunted daemon."""
     try:
         # Check if initialized
@@ -134,6 +199,10 @@ def start(background):
 
         # Load configuration
         config = load_config()
+        
+        # Override auto-exit setting if flag is provided
+        if auto_exit:
+            config.daemon.auto_exit_when_idle = True
 
         console.print("[cyan]Starting Haunted daemon...[/cyan]")
 
@@ -142,7 +211,7 @@ def start(background):
             return
 
         # Start updated daemon with Claude Code integration
-        from ..daemon.service_updated import HauntedDaemonUpdated
+        from haunted.daemon.service_updated import HauntedDaemonUpdated
 
         daemon = HauntedDaemonUpdated(config)
         asyncio.run(daemon.start())
@@ -246,7 +315,14 @@ def create_phase(name, description):
     try:
         config = load_config()
         db_manager = DatabaseManager(config.database.url)
-        git_manager = GitManager()
+        
+        # Try to initialize Git manager, but don't fail if Git is not available
+        git_manager = None
+        try:
+            git_manager = GitManager()
+        except Exception as git_init_error:
+            console.print(f"[yellow]⚠[/yellow] Git not available: {git_init_error}")
+            console.print("[dim]Phase will be created without Git branch[/dim]")
 
         async def create():
             # Create phase in database
@@ -257,16 +333,20 @@ def create_phase(name, description):
             phase_name = phase["name"]
             phase_branch = phase["branch_name"]
 
-            # Create Git branch using stored properties
-            try:
-                git_manager.create_branch(phase_branch, "main")
-                logger.info(f"Created Git branch: {phase_branch}")
-            except Exception as git_error:
-                logger.warning(f"Git branch creation failed: {git_error}")
+            # Create Git branch if Git is available
+            if git_manager:
+                try:
+                    git_manager.create_branch(phase_branch, "main")
+                    logger.info(f"Created Git branch: {phase_branch}")
+                    console.print(f"[green]✓[/green] Created Git branch: {phase_branch}")
+                except Exception as git_error:
+                    logger.warning(f"Git branch creation failed: {git_error}")
+                    console.print(f"[yellow]⚠[/yellow] Could not create Git branch: {git_error}")
 
             console.print(f"[green]✓[/green] Created phase: {phase_name}")
             console.print(f"  ID: {phase_id}")
-            console.print(f"  Branch: {phase_branch}")
+            if git_manager:
+                console.print(f"  Branch: {phase_branch}")
 
         asyncio.run(create())
 
@@ -300,7 +380,7 @@ def list_phases():
                 # Handle datetime formatting
                 created_at_str = str(phase["created_at"])[:10]  # Get YYYY-MM-DD part
                 table.add_row(
-                    phase["id"][:8],
+                    str(phase["id"]),
                     phase["name"],
                     phase["status"],
                     phase["branch_name"],
@@ -338,7 +418,14 @@ def create_issue(title, description, priority, phase):
     try:
         config = load_config()
         db_manager = DatabaseManager(config.database.url)
-        git_manager = GitManager()
+        
+        # Try to initialize Git manager, but don't fail if Git is not available
+        git_manager = None
+        try:
+            git_manager = GitManager()
+        except Exception as git_init_error:
+            console.print(f"[yellow]⚠[/yellow] Git not available: {git_init_error}")
+            console.print("[dim]Issue will be created without Git branch[/dim]")
 
         async def create():
             # Create issue in database
@@ -351,17 +438,21 @@ def create_issue(title, description, priority, phase):
             issue_branch = issue["branch_name"]
             issue_stage = issue["workflow_stage"]
 
-            # Create Git branch (using stored properties)
-            try:
-                git_manager.create_branch(issue_branch, "main")
-                logger.info(f"Created Git branch: {issue_branch}")
-            except Exception as git_error:
-                logger.warning(f"Git branch creation failed: {git_error}")
+            # Create Git branch if Git is available
+            if git_manager:
+                try:
+                    git_manager.create_branch(issue_branch, "main")
+                    logger.info(f"Created Git branch: {issue_branch}")
+                    console.print(f"[green]✓[/green] Created Git branch: {issue_branch}")
+                except Exception as git_error:
+                    logger.warning(f"Git branch creation failed: {git_error}")
+                    console.print(f"[yellow]⚠[/yellow] Could not create Git branch: {git_error}")
 
             console.print(f"[green]✓[/green] Created issue: {issue_title}")
             console.print(f"  ID: {issue_id}")
             console.print(f"  Priority: {issue_priority}")
-            console.print(f"  Branch: {issue_branch}")
+            if git_manager:
+                console.print(f"  Branch: {issue_branch}")
             console.print(f"  Workflow Stage: {issue_stage}")
 
         asyncio.run(create())
@@ -420,7 +511,7 @@ def list_issues(status, stage):
                 created_at_str = str(issue["created_at"])[:10]  # Get YYYY-MM-DD part
 
                 table.add_row(
-                    issue["id"][:8],
+                    str(issue["id"]),
                     issue["title"],
                     f"[{priority_color}]{issue['priority']}[/{priority_color}]",
                     issue["status"],
@@ -452,22 +543,23 @@ def show_issue(issue_id):
                 return
 
             # Issue details
-            console.print(f"\n[bold cyan]Issue #{issue.id}[/bold cyan]")
-            console.print(f"[green]Title:[/green] {issue.title}")
-            console.print(f"[green]Description:[/green] {issue.description}")
-            console.print(f"[green]Priority:[/green] {issue.priority}")
-            console.print(f"[green]Status:[/green] {issue.status}")
-            console.print(f"[green]Workflow Stage:[/green] {issue.workflow_stage}")
-            console.print(f"[green]Branch:[/green] {issue.branch_name}")
+            console.print(f"\n[bold cyan]Issue #{issue['id']}[/bold cyan]")
+            console.print(f"[green]Title:[/green] {issue['title']}")
+            console.print(f"[green]Description:[/green] {issue['description']}")
+            console.print(f"[green]Priority:[/green] {issue['priority']}")
+            console.print(f"[green]Status:[/green] {issue['status']}")
+            console.print(f"[green]Workflow Stage:[/green] {issue['workflow_stage']}")
+            console.print(f"[green]Branch:[/green] {issue['branch_name']}")
 
-            if issue.plan:
-                console.print(Panel(issue.plan, title="Implementation Plan"))
+            # Display plan and diagnosis log if available
+            if issue.get('plan'):
+                console.print(Panel(issue['plan'], title="Implementation Plan"))
 
-            if issue.diagnosis_log:
-                console.print(Panel(issue.diagnosis_log, title="Diagnosis Log"))
+            if issue.get('diagnosis_log'):
+                console.print(Panel(issue['diagnosis_log'], title="Diagnosis Log"))
 
             # Comments
-            comments = await db_manager.get_comments(issue.id)
+            comments = await db_manager.get_comments(issue['id'])
             if comments:
                 console.print(f"\n[bold]Comments ({len(comments)}):[/bold]")
                 for comment in comments:

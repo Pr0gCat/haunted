@@ -4,10 +4,10 @@ import subprocess
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
-from ..core.database import DatabaseManager
-from ..core.git_manager import GitManager
-from ..models import Task
-from ..utils.logger import get_logger
+from haunted.core.database import DatabaseManager
+from haunted.core.git_manager import GitManager
+from haunted.models import Task
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -360,7 +360,7 @@ class MCPToolHandler:
         Returns:
             Task ID
         """
-        from ..models import TaskStatus
+        from haunted.models import TaskStatus
 
         task = Task(
             # id will be auto-generated
