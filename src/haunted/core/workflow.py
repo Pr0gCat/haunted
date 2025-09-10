@@ -20,14 +20,15 @@ class WorkflowEngine:
     Plan → Implement → Unit Test → Fix Issues → Integration Test → Diagnose → Done
     """
 
-    def __init__(self, db_manager: "DatabaseManager"):
+    def __init__(self, db_manager: "DatabaseManager", project_root: str = "."):
         """
         Initialize workflow engine.
 
         Args:
             db_manager: Database manager for persistence
+            project_root: Project root directory for file operations
         """
-        self.claude_wrapper = ClaudeCodeWrapper()
+        self.claude_wrapper = ClaudeCodeWrapper(project_root)
         self.db = db_manager
 
         # Map workflow stages to handler methods

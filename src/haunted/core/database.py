@@ -1,8 +1,10 @@
 """Database management for Haunted."""
 
+import os
 from datetime import datetime
 from typing import List, Optional, AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from sqlmodel import SQLModel, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -25,13 +27,20 @@ logger = get_logger(__name__)
 class DatabaseManager:
     """Manages database operations for Haunted."""
 
-    def __init__(self, database_url: str = "sqlite:////.haunted/haunted.db"):
+    def __init__(self, database_url: str = None):
         """
         Initialize database manager.
 
         Args:
             database_url: Database connection URL
         """
+        if database_url is None:
+            # Use current working directory for .haunted folder
+            cwd = Path(os.getcwd())
+            haunted_dir = cwd / ".haunted"
+            haunted_dir.mkdir(exist_ok=True)
+            database_url = f"sqlite:///{haunted_dir}/haunted.db"
+        
         self.database_url = database_url
 
         # Create async engine for SQLite
@@ -51,7 +60,7 @@ class DatabaseManager:
         else:
             self.engine = create_async_engine(database_url)
 
-        logger.info(f"Database initialized: {database_url}")
+        logger.debug(f"Database initialized: {database_url}")
 
     async def create_tables(self):
         """Create all database tables."""

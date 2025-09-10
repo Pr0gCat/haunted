@@ -12,9 +12,10 @@ logger = get_logger(__name__)
 class ClaudeCodeWrapper:
     """Wrapper for Claude Code CLI - uses --output-format json for structured responses."""
 
-    def __init__(self):
+    def __init__(self, project_root: str = "."):
         """Initialize Claude Code wrapper."""
         self.claude_cmd = "claude"
+        self.project_root = project_root
 
     async def check_claude_availability(self) -> bool:
         """
@@ -60,10 +61,15 @@ class ClaudeCodeWrapper:
         try:
             response = await self._execute_claude_query(
                 prompt,
-                "You are an expert software architect analyzing issues and creating implementation plans.",
+                "You are an expert software architect analyzing issues and creating implementation plans. Respond in English.",
             )
             logger.info(f"Generated plan for issue {issue_dict.get('id', 'unknown')}")
-            return response
+            
+            # Extract the actual result from the JSON response
+            if isinstance(response, dict) and "result" in response:
+                return {"plan": response["result"], "metadata": response}
+            else:
+                return response
 
         except Exception as e:
             logger.error(
@@ -86,12 +92,17 @@ class ClaudeCodeWrapper:
         try:
             response = await self._execute_claude_query(
                 prompt,
-                "You are an expert software developer implementing solutions based on plans.",
+                "You are an expert software developer implementing solutions. Create actual files using your file creation tools. Respond in English.",
             )
             logger.info(
                 f"Generated implementation for issue {issue_dict.get('id', 'unknown')}"
             )
-            return response
+            
+            # Extract the actual result from the JSON response
+            if isinstance(response, dict) and "result" in response:
+                return {"implementation": response["result"], "metadata": response}
+            else:
+                return response
 
         except Exception as e:
             logger.error(
@@ -188,6 +199,8 @@ class ClaudeCodeWrapper:
                 "--print",  # Non-interactive mode
                 "--output-format",
                 "json",  # Request JSON output
+                "--permission-mode",
+                "bypassPermissions",  # Bypass permission prompts for file operations
                 prompt,
             ]
 
@@ -195,13 +208,15 @@ class ClaudeCodeWrapper:
             if system_prompt:
                 cmd.extend(["--append-system-prompt", system_prompt])
 
-            # Execute Claude CLI command
+            # Execute Claude CLI command in the project directory
+            import os
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout
                 encoding="utf-8",
+                cwd=self.project_root,  # Use the configured project root
             )
 
             if result.returncode != 0:
@@ -256,6 +271,10 @@ Provide a comprehensive analysis that will guide the implementation of this issu
     def _build_implement_prompt(self, issue_dict: Dict[str, Any]) -> str:
         """Build implementation prompt for Claude Code CLI."""
         plan = issue_dict.get("plan", "No plan available")
+        
+        # Extract plan text if it's in a dict
+        if isinstance(plan, dict):
+            plan = plan.get("plan", str(plan))
 
         return f"""# Implementation Task
 
@@ -267,15 +286,18 @@ Provide a comprehensive analysis that will guide the implementation of this issu
 {plan}
 
 ## Task
-Based on the above plan, please provide detailed implementation guidance. Include:
+Based on the above plan, please CREATE the actual implementation files. 
 
-1. **Files**: List all files that need to be created or modified, including their complete content and purpose
-2. **Code Structure**: Describe the main components and how files are organized
-3. **Implementation Notes**: Provide implementation details and best practices
-4. **Integration Points**: Explain how this integrates with existing code and any configuration changes needed
-5. **Next Steps**: Outline the steps needed to complete the implementation
+**IMPORTANT**: You MUST use your file creation tools (Write, Edit, MultiEdit) to create the actual files.
 
-Provide complete, working code for all files mentioned in the implementation."""
+1. Create all necessary files (HTML, CSS, JavaScript, etc.) for a complete Snake game
+2. Implement the specific feature described in the issue
+3. Ensure the code is complete, working, and follows best practices
+4. The game should be playable in a web browser
+
+Do not just describe what to do - actually CREATE the files with complete, working code.
+
+Start by checking what files already exist, then create or modify files as needed."""
 
     def _build_test_prompt(self, issue_dict: Dict[str, Any]) -> str:
         """Build testing prompt for Claude Code CLI."""

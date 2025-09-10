@@ -34,7 +34,7 @@ class HauntedDaemonUpdated:
         self.git_manager = GitManager(config.project_root)
 
         # Use full workflow engine with Claude Code CLI
-        self.workflow_engine = WorkflowEngine(self.db_manager)
+        self.workflow_engine = WorkflowEngine(self.db_manager, config.project_root)
 
         # Track active issues to prevent duplicates
         self.active_issues: Dict[str, asyncio.Task] = {}
