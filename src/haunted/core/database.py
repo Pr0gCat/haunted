@@ -336,6 +336,44 @@ class DatabaseManager:
     async def get_open_issues_by_priority(self) -> List[Issue]:
         """Get open issues ordered by priority."""
         return await self.list_issues(status=IssueStatus.OPEN)
+    
+    async def get_processable_issues_by_priority(self) -> List[dict]:
+        """Get processable issues (OPEN and IN_PROGRESS) ordered by priority."""
+        from sqlalchemy import text
+        
+        async with self.get_session() as session:
+            # Get both OPEN and IN_PROGRESS issues
+            sql = """
+                SELECT id, title, description, priority, status, workflow_stage, phase_id, branch_name, created_at, updated_at 
+                FROM issues 
+                WHERE LOWER(status) IN ('open', 'in_progress')
+                ORDER BY CASE 
+                    WHEN LOWER(priority) = 'high' THEN 1 
+                    WHEN LOWER(priority) = 'medium' THEN 2 
+                    WHEN LOWER(priority) = 'low' THEN 3 
+                    ELSE 4 
+                END, created_at ASC
+            """
+            
+            result = await session.execute(text(sql))
+            rows = result.fetchall()
+            
+            issue_list = []
+            for row in rows:
+                issue_dict = {
+                    "id": row.id,
+                    "title": row.title,
+                    "description": row.description,
+                    "priority": row.priority,
+                    "status": row.status,
+                    "workflow_stage": row.workflow_stage,
+                    "phase_id": row.phase_id,
+                    "branch_name": row.branch_name,
+                    "created_at": row.created_at,
+                    "updated_at": row.updated_at,
+                }
+                issue_list.append(issue_dict)
+            return issue_list
 
     # Task operations
     async def create_task(self, task: Task) -> Task:

@@ -2,7 +2,7 @@
 
 import json
 import subprocess
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import re
 
@@ -64,14 +64,23 @@ class ClaudeCodeWrapper:
             response = await self._execute_claude_query(
                 prompt,
                 "You are an expert software architect analyzing issues and creating implementation plans. Respond in English.",
+                disallowed_tools=["Write", "Edit", "MultiEdit", "NotebookEdit"]
             )
             logger.info(f"Generated plan for issue {issue_dict.get('id', 'unknown')}")
             
-            # Extract the actual result from the JSON response
-            if isinstance(response, dict) and "result" in response:
-                return {"plan": response["result"], "metadata": response}
-            else:
+            # Check if there's an error in the response
+            if isinstance(response, dict) and "error" in response:
+                logger.error(f"Claude returned an error: {response['error']}")
                 return response
+            
+            # Extract the actual content from the response
+            if isinstance(response, dict) and "content" in response:
+                return {"plan": response["content"], "metadata": response.get("metadata")}
+            elif isinstance(response, dict) and "result" in response:
+                return {"plan": response["result"], "metadata": response.get("metadata")}
+            else:
+                # Assume the response itself is the plan
+                return {"plan": response}
 
         except Exception as e:
             logger.error(
@@ -100,11 +109,19 @@ class ClaudeCodeWrapper:
                 f"Generated implementation for issue {issue_dict.get('id', 'unknown')}"
             )
             
-            # Extract the actual result from the JSON response
-            if isinstance(response, dict) and "result" in response:
-                return {"implementation": response["result"], "metadata": response}
-            else:
+            # Check if there's an error in the response
+            if isinstance(response, dict) and "error" in response:
+                logger.error(f"Claude returned an error: {response['error']}")
                 return response
+            
+            # Extract the actual content from the response
+            if isinstance(response, dict) and "content" in response:
+                return {"implementation": response["content"], "metadata": response.get("metadata")}
+            elif isinstance(response, dict) and "result" in response:
+                return {"implementation": response["result"], "metadata": response.get("metadata")}
+            else:
+                # Assume the response itself is the implementation
+                return {"implementation": response}
 
         except Exception as e:
             logger.error(
@@ -154,7 +171,9 @@ class ClaudeCodeWrapper:
 
         try:
             response = await self._execute_claude_query(
-                prompt, "You are an expert in debugging and problem diagnosis."
+                prompt, 
+                "You are an expert in debugging and problem diagnosis.",
+                disallowed_tools=["Write", "Edit", "MultiEdit", "NotebookEdit"]
             )
             logger.info(
                 f"Generated diagnosis for issue {issue_dict.get('id', 'unknown')}"
@@ -191,7 +210,7 @@ class ClaudeCodeWrapper:
             return {"error": f"Merge conflict resolution failed: {e}"}
 
     async def _execute_claude_query(
-        self, prompt: str, system_prompt: str = ""
+        self, prompt: str, system_prompt: str = "", disallowed_tools: List[str] = None
     ) -> Dict[str, Any]:
         """
         Execute a query using Claude Code CLI with JSON output format.
@@ -199,6 +218,7 @@ class ClaudeCodeWrapper:
         Args:
             prompt: The prompt to send to Claude
             system_prompt: System prompt for context
+            disallowed_tools: List of tool names to disallow (e.g., ["Write", "Edit", "MultiEdit"])
 
         Returns:
             Claude's response as parsed JSON dictionary
@@ -207,6 +227,8 @@ class ClaudeCodeWrapper:
             logger.info("Executing Claude Code CLI query:")
             logger.info(f"System prompt: {system_prompt}")
             logger.info(f"User prompt: {prompt}")
+            if disallowed_tools:
+                logger.info(f"Disallowed tools: {', '.join(disallowed_tools)}")
 
             # Build Claude CLI command with JSON output format
             cmd = [
@@ -215,15 +237,21 @@ class ClaudeCodeWrapper:
                 "--output-format",
                 "json",  # Request JSON output
                 "--permission-mode",
-                "bypassPermissions",  # Bypass permission prompts for file operations
-                f'"{prompt}"',
+                "bypassPermissions",  # Allow permissions but restrict tools
             ]
+            
+            # Add disallowed tools if specified
+            if disallowed_tools:
+                cmd.extend(["--disallowed-tools", " ".join(disallowed_tools)])
 
             # Add system prompt if provided
             if system_prompt:
-                cmd.extend(["--append-system-prompt", f'"{system_prompt}"'])
+                cmd.extend(["--append-system-prompt", system_prompt])
+            
+            # Add the prompt as the last argument (without extra quotes)
+            cmd.append(prompt)
 
-            logger.debug(f"Executing Claude CLI command: {' '.join(cmd)}")
+            logger.debug(f"Executing Claude CLI command: {' '.join(cmd[:5])}... [prompt truncated]")
             
             # Execute Claude CLI command in the project directory
             result = subprocess.run(
@@ -233,6 +261,7 @@ class ClaudeCodeWrapper:
                 timeout=300,  # 5 minute timeout
                 encoding="utf-8",
                 cwd=self.project_root,  # Use the configured project root
+                shell=False,  # Don't use shell to avoid quote issues
             )
             logger.debug(f"Claude CLI result: {result.stdout}")
 
@@ -255,7 +284,10 @@ class ClaudeCodeWrapper:
                 logger.info(
                     f"Claude CLI responded with JSON: {len(result.stdout)} characters"
                 )
-                return response_json
+                
+                # Parse JSON output and extract assistant content
+                json_result = self._parse_json_output(response_json)
+                return json_result
 
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse Claude CLI JSON response: {e}")
@@ -319,14 +351,6 @@ class ClaudeCodeWrapper:
 
         return None
 
-
-class ClaudeRateLimitError(Exception):
-    """Raised when Claude CLI indicates a rate/usage limit has been reached."""
-
-    def __init__(self, message: str, reset_at: Optional[datetime] = None):
-        super().__init__(message)
-        self.reset_at = reset_at
-
     def _sanitize_json_output(self, output: str) -> str:
         """Sanitize Claude CLI output to extract a JSON object string.
 
@@ -380,6 +404,57 @@ class ClaudeRateLimitError(Exception):
                     if depth == 0:
                         return text[start : i + 1]
         return ""
+
+    def _parse_json_output(self, response_json: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse JSON output format from Claude Code CLI."""
+        
+        # Check if this is an error response
+        if response_json.get("type") == "result" and response_json.get("subtype") == "error_during_execution":
+            error_msg = response_json.get("error", "Unknown error occurred during execution")
+            logger.error(f"Claude CLI execution error: {error_msg}")
+            return {"error": error_msg, "metadata": response_json}
+        
+        # Check for successful completion
+        if response_json.get("type") == "result" and response_json.get("subtype") == "success" and not response_json.get("is_error"):
+            usage = response_json.get("usage", {})
+            input_tokens = (usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0))
+            output_tokens = usage.get("output_tokens", 0)
+            total_tokens = input_tokens + output_tokens
+            
+            # Extract the actual content from the result field
+            content = response_json.get("result", "")
+            
+            return {
+                "content": content,
+                "metadata": {
+                    "success": True,
+                    "tokens_used": total_tokens,
+                    "token_details": {
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "cache_creation_tokens": usage.get("cache_creation_input_tokens"),
+                        "cache_read_tokens": usage.get("cache_read_input_tokens"),
+                    },
+                    "session_id": response_json.get("session_id"),
+                    "cost_usd": response_json.get("total_cost_usd"),
+                    "duration_ms": response_json.get("duration_ms"),
+                    "raw_result": response_json
+                }
+            }
+        else:
+            # Handle other response types or errors
+            if "result" in response_json:
+                actual_result = response_json["result"]
+                if isinstance(actual_result, str):
+                    return {"content": actual_result, "metadata": response_json}
+                elif isinstance(actual_result, dict):
+                    actual_result["metadata"] = response_json
+                    return actual_result
+                else:
+                    return {"result": actual_result, "metadata": response_json}
+            
+            # Fallback - return the response as-is
+            return response_json
 
     def _build_plan_prompt(self, issue_dict: Dict[str, Any]) -> str:
         """Build planning prompt for Claude Code CLI."""
@@ -591,3 +666,11 @@ Using your file editing tools, resolve ALL merge conflicts in the repository:
 
 When finished, briefly summarize the major decisions you made per file.
 """
+
+
+class ClaudeRateLimitError(Exception):
+    """Raised when Claude CLI indicates a rate/usage limit has been reached."""
+
+    def __init__(self, message: str, reset_at: Optional[datetime] = None):
+        super().__init__(message)
+        self.reset_at = reset_at

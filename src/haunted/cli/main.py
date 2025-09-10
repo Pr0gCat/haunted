@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
+from haunted import __version__
 from haunted.utils.config import get_config_manager, load_config
 from haunted.utils.logger import setup_logging, get_logger
 from haunted.core.database import DatabaseManager
@@ -490,11 +491,11 @@ def show_issue(issue_id):
             console.print(f"[green]Branch:[/green] {issue.branch_name}")
 
             # Display plan and diagnosis log if available
-            if issue.get('plan'):
-                console.print(Panel(issue['plan'], title="Implementation Plan"))
+            if issue.plan:
+                console.print(Panel(issue.plan, title="Implementation Plan"))
 
-            if issue.get('diagnosis_log'):
-                console.print(Panel(issue['diagnosis_log'], title="Diagnosis Log"))
+            if hasattr(issue, 'diagnosis_log') and issue.diagnosis_log:
+                console.print(Panel(issue.diagnosis_log, title="Diagnosis Log"))
 
             # Comments - get within the same session
             from sqlmodel import select

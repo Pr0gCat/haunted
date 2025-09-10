@@ -87,10 +87,6 @@ uvx haunted phase create "Phase 1 - Core Features" --description "Essential feat
 
 # Channel additional requests into specific phases
 uvx haunted issue create "Add password reset" --phase <phase-id> --priority medium
-
-# Switch working context to a phase (checkout + mark active)
-uvx haunted phase switch <phase-id|phase-name>
-uvx haunted phase switch "Phase 1 - Core Features" --no-deactivate-others
 ```
 
 ### 3. Release the Autonomous Spirit
@@ -154,24 +150,6 @@ Haunted implements the development workflow from `docs/DEVELOPMENT_WORKFLOW.md`:
 
 - `uvx haunted phase create <name>` - Create new phase
 - `uvx haunted phase list` - List all phases
-- `uvx haunted phase switch <id|name> [--no-deactivate-others]` - Checkout the phase branch and mark it active (by default deactivates others)
-
-## 📚 Documentation
-
-### User Documentation
-- **[User Manual](docs/USER_MANUAL.md)** - Comprehensive guide to using Haunted
-- **[CLI Reference](docs/CLI_REFERENCE.md)** - Complete command reference with examples
-- **[Configuration Guide](docs/CONFIGURATION.md)** - Detailed configuration options
-- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Solutions to common problems
-
-### Tutorials
-- **[Getting Started](docs/TUTORIALS/getting-started.md)** - Your first Haunted project
-- **[Basic Workflow](docs/TUTORIALS/basic-workflow.md)** - Understanding the development workflow
-- **[Advanced Features](docs/TUTORIALS/advanced-features.md)** - Power user techniques
-
-### Developer Documentation
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture and design
-- **[Development Workflow](docs/DEVELOPMENT_WORKFLOW.md)** - The AI development methodology
 
 ## Configuration
 

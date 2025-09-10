@@ -203,11 +203,11 @@ class HauntedDaemon:
 
         while self.running:
             try:
-                # Get open issues ordered by priority
-                issues = await self.db_manager.get_open_issues_by_priority()
+                # Get processable issues (both open and in-progress) ordered by priority
+                issues = await self.db_manager.get_processable_issues_by_priority()
                 try:
                     logger.debug(
-                        f"Scanner fetched {len(issues)} open issues: "
+                        f"Scanner fetched {len(issues)} processable issues: "
                         f"{[i.get('id') if isinstance(i, dict) else getattr(i, 'id', None) for i in issues]}"
                     )
                 except Exception:

@@ -87,10 +87,6 @@ uvx haunted phase create "第一階段 - 核心功能" --description "MVP 的基
 
 # 將額外請求引導到特定階段
 uvx haunted issue create "添加密碼重設" --phase <phase-id> --priority medium
-
-# 切換到某個階段（自動 checkout 並標記為啟用）
-uvx haunted phase switch <phase-id|phase-name>
-uvx haunted phase switch "第一階段 - 核心功能" --no-deactivate-others
 ```
 
 ### 3. 釋放自主靈體
@@ -154,24 +150,6 @@ Haunted 實現了來自 `docs/DEVELOPMENT_WORKFLOW.md` 的開發工作流程：
 
 - `uvx haunted phase create <名稱>` - 創建新階段
 - `uvx haunted phase list` - 列出所有階段
-- `uvx haunted phase switch <id|name> [--no-deactivate-others]` - 切換到該階段分支並標記為啟用（預設會將其他階段降為規劃中）
-
-## 📚 文檔
-
-### 使用者文檔
-- **[使用手冊](docs/USER_MANUAL_zh-TW.md)** - Haunted 完整使用指南（繁體中文）
-- **[故障排除指南](docs/TROUBLESHOOTING.md)** - 常見問題解決方案（英文）
-- **[CLI 參考](docs/CLI_REFERENCE.md)** - 完整的命令參考與範例（英文）
-- **[設定指南](docs/CONFIGURATION.md)** - 詳細的設定選項（英文）
-
-### 教學
-- **[快速入門](docs/TUTORIALS/getting-started.md)** - 你的第一個 Haunted 專案（英文）
-- **[基本工作流程](docs/TUTORIALS/basic-workflow.md)** - 理解開發工作流程（英文）
-- **[進階功能](docs/TUTORIALS/advanced-features.md)** - 進階使用者技巧（英文）
-
-### 開發者文檔
-- **[架構概覽](docs/ARCHITECTURE.md)** - 技術架構與設計（英文）
-- **[開發工作流程](docs/DEVELOPMENT_WORKFLOW.md)** - AI 開發方法論（中文）
 
 ## ⚙️ 靈異配置
 

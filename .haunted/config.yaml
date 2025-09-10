@@ -4,13 +4,14 @@ ai:
   model: claude-3-sonnet-20240229
   rate_limit_retry: true
 daemon:
+  auto_exit_when_idle: false
   max_iterations: 3
   scan_interval: 30
 database:
   echo: false
-  url: sqlite:///.haunted/haunted.db
+  url: sqlite:///C:\Users\LTY\Desktop\haunted\.haunted/haunted.db
 git:
   auto_commit: true
   auto_merge: true
   commit_message_template: 'Issue #{issue_id}: {stage} - {description}'
-project_root: .
+project_root: C:\Users\LTY\Desktop\haunted

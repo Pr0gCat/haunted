@@ -1,0 +1,53 @@
+[project]
+name = "haunted"
+version = "0.1.1"
+description = "👻 Spectral Software Solutions - Your codebase just got possessed by supernatural development powers"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "ProgCat", email = "progcat@protonmail.com" }
+]
+requires-python = ">=3.10"
+keywords = ["ai", "development", "automation", "workflow", "claude", "spectral", "haunted"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11", 
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Code Generators",
+]
+
+dependencies = [
+    "claude-code-sdk",
+    "click>=8.1.0",
+    "sqlmodel>=0.0.14",
+    "pydantic>=2.0.0",
+    "rich>=13.0.0",
+    "gitpython>=3.1.0",
+    "pyyaml>=6.0",
+    "aiofiles>=23.0.0",
+    "python-dotenv>=1.0.0",
+    "aiosqlite>=0.19.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/progcat/haunted"
+Repository = "https://github.com/progcat/haunted"
+Issues = "https://github.com/progcat/haunted/issues"
+Documentation = "https://github.com/progcat/haunted/blob/main/README.md"
+
+[project.scripts]
+haunted = "haunted.cli.main:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/haunted"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

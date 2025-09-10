@@ -127,6 +127,16 @@ class WorkflowEngine:
             # Final database update for completed workflow
             try:
                 from haunted.models.issue import Issue
+                # Convert datetime strings to datetime objects if needed
+                created_at = issue_dict["created_at"]
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace(' ', 'T'))
+                updated_at = issue_dict["updated_at"]
+                if isinstance(updated_at, str):
+                    updated_at = datetime.fromisoformat(updated_at.replace(' ', 'T'))
+                elif updated_at is None:
+                    updated_at = datetime.now()
+                    
                 issue_obj = Issue(
                     id=issue_dict["id"],
                     title=issue_dict["title"],
@@ -139,8 +149,8 @@ class WorkflowEngine:
                     plan=issue_dict.get("plan"),
                     diagnosis_log=issue_dict.get("diagnosis_log"),
                     iteration_count=issue_dict["iteration_count"],
-                    created_at=issue_dict["created_at"],
-                    updated_at=issue_dict["updated_at"]
+                    created_at=created_at,
+                    updated_at=updated_at
                 )
                 await self.db.update_issue(issue_obj)
                 logger.info(f"Final update for completed issue {issue_dict['id']}")
@@ -161,6 +171,16 @@ class WorkflowEngine:
             # Update database for blocked issue
             try:
                 from haunted.models.issue import Issue
+                # Convert datetime strings to datetime objects if needed
+                created_at = issue_dict["created_at"]
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace(' ', 'T'))
+                updated_at = issue_dict["updated_at"]
+                if isinstance(updated_at, str):
+                    updated_at = datetime.fromisoformat(updated_at.replace(' ', 'T'))
+                elif not isinstance(updated_at, datetime):
+                    updated_at = datetime.now()
+                    
                 issue_obj = Issue(
                     id=issue_dict["id"],
                     title=issue_dict["title"],
@@ -173,8 +193,8 @@ class WorkflowEngine:
                     plan=issue_dict.get("plan"),
                     diagnosis_log=issue_dict.get("diagnosis_log"),
                     iteration_count=issue_dict["iteration_count"],
-                    created_at=issue_dict["created_at"],
-                    updated_at=issue_dict["updated_at"]
+                    created_at=created_at,
+                    updated_at=updated_at
                 )
                 await self.db.update_issue(issue_obj)
                 logger.info(f"Updated blocked issue {issue_dict['id']}")
