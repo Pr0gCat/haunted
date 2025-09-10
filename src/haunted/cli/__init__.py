@@ -1,5 +1,5 @@
 """CLI package for Haunted."""
 
-from .main import cli
+from haunted.cli.main import cli
 
 __all__ = ["cli"]

@@ -87,6 +87,10 @@ uvx haunted phase create "第一階段 - 核心功能" --description "MVP 的基
 
 # 將額外請求引導到特定階段
 uvx haunted issue create "添加密碼重設" --phase <phase-id> --priority medium
+
+# 切換到某個階段（自動 checkout 並標記為啟用）
+uvx haunted phase switch <phase-id|phase-name>
+uvx haunted phase switch "第一階段 - 核心功能" --no-deactivate-others
 ```
 
 ### 3. 釋放自主靈體
@@ -150,6 +154,7 @@ Haunted 實現了來自 `docs/DEVELOPMENT_WORKFLOW.md` 的開發工作流程：
 
 - `uvx haunted phase create <名稱>` - 創建新階段
 - `uvx haunted phase list` - 列出所有階段
+- `uvx haunted phase switch <id|name> [--no-deactivate-others]` - 切換到該階段分支並標記為啟用（預設會將其他階段降為規劃中）
 
 ## ⚙️ 靈異配置
 

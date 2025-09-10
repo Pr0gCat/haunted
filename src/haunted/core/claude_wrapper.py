@@ -2,9 +2,11 @@
 
 import json
 import subprocess
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from datetime import datetime, timedelta
+import re
 
-from ..utils.logger import get_logger
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -165,6 +167,29 @@ class ClaudeCodeWrapper:
             )
             return {"error": f"Diagnosis failed: {e}"}
 
+    async def resolve_merge_conflicts(self, conflict_summary: str) -> Dict[str, Any]:
+        """
+        Resolve git merge conflicts by editing files via Claude Code CLI tools.
+
+        Args:
+            conflict_summary: Text description of conflicted files and context
+
+        Returns:
+            Resolution result as JSON dictionary
+        """
+        prompt = self._build_merge_conflict_prompt(conflict_summary)
+
+        try:
+            response = await self._execute_claude_query(
+                prompt,
+                "You are an expert software engineer resolving git merge conflicts. Use file editing tools to fix conflicts and preserve intent from both branches. Respond in English.",
+            )
+            logger.info("Claude attempted to resolve merge conflicts")
+            return response
+        except Exception as e:
+            logger.error(f"Merge conflict resolution failed: {e}")
+            return {"error": f"Merge conflict resolution failed: {e}"}
+
     async def _execute_claude_query(
         self, prompt: str, system_prompt: str = ""
     ) -> Dict[str, Any]:
@@ -183,16 +208,6 @@ class ClaudeCodeWrapper:
             logger.info(f"System prompt: {system_prompt}")
             logger.info(f"User prompt: {prompt}")
 
-            # Print prompt to console
-            print("\n" + "=" * 60)
-            print("📝 PROMPT TO CLAUDE CODE CLI")
-            print("=" * 60)
-            if system_prompt:
-                print(f"🎯 SYSTEM: {system_prompt}")
-                print("-" * 60)
-            print(f"💬 USER: {prompt}")
-            print("=" * 60)
-
             # Build Claude CLI command with JSON output format
             cmd = [
                 self.claude_cmd,
@@ -201,15 +216,16 @@ class ClaudeCodeWrapper:
                 "json",  # Request JSON output
                 "--permission-mode",
                 "bypassPermissions",  # Bypass permission prompts for file operations
-                prompt,
+                f'"{prompt}"',
             ]
 
             # Add system prompt if provided
             if system_prompt:
-                cmd.extend(["--append-system-prompt", system_prompt])
+                cmd.extend(["--append-system-prompt", f'"{system_prompt}"'])
 
+            logger.debug(f"Executing Claude CLI command: {' '.join(cmd)}")
+            
             # Execute Claude CLI command in the project directory
-            import os
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -218,22 +234,23 @@ class ClaudeCodeWrapper:
                 encoding="utf-8",
                 cwd=self.project_root,  # Use the configured project root
             )
+            logger.debug(f"Claude CLI result: {result.stdout}")
 
-            if result.returncode != 0:
-                logger.error(f"Claude CLI failed with return code {result.returncode}")
-                logger.error(f"stderr: {result.stderr}")
-                raise Exception(f"Claude CLI failed: {result.stderr}")
+            # Detect rate limit or quota errors before parsing JSON
+            rate_limit_reset = self._detect_rate_limit(result.stdout, result.stderr)
+            if rate_limit_reset is not None:
+                raise ClaudeRateLimitError("Claude CLI rate limit reached", rate_limit_reset)
 
-            # Parse JSON response
+            # Parse JSON response (be tolerant to wrappers like code fences or logs)
             try:
-                response_json = json.loads(result.stdout)
+                raw_output = result.stdout or ""
+                if not raw_output.strip():
+                    logger.error("Claude CLI produced empty stdout")
+                    logger.error(f"stderr: {result.stderr}")
+                    raise Exception("Empty response from Claude CLI")
 
-                # Print Claude Code response to console
-                print("\n" + "=" * 60)
-                print("🤖 CLAUDE CODE CLI JSON RESPONSE")
-                print("=" * 60)
-                print(json.dumps(response_json, indent=2))
-                print("=" * 60 + "\n")
+                sanitized = self._sanitize_json_output(raw_output)
+                response_json = json.loads(sanitized)
 
                 logger.info(
                     f"Claude CLI responded with JSON: {len(result.stdout)} characters"
@@ -243,11 +260,126 @@ class ClaudeCodeWrapper:
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse Claude CLI JSON response: {e}")
                 logger.error(f"Raw output: {result.stdout}")
+                # If the raw output indicates rate limit, raise a structured error
+                rate_limit_reset = self._detect_rate_limit(result.stdout, result.stderr)
+                if rate_limit_reset is not None:
+                    raise ClaudeRateLimitError("Claude CLI rate limit reached", rate_limit_reset)
                 raise Exception(f"Invalid JSON response from Claude CLI: {e}")
 
         except Exception as e:
             logger.error(f"Error executing Claude CLI query: {e}")
             raise Exception(f"Error executing Claude CLI query: {e}")
+
+    def _detect_rate_limit(self, stdout: Optional[str], stderr: Optional[str]) -> Optional[datetime]:
+        """Detect rate limit or usage limit reached messages and return reset datetime if known.
+
+        Recognizes phrases such as:
+        - "limit reached"
+        - "rate limit"
+        - "5-hour limit reached ∙ resets 6pm"
+        Attempts to parse a reset time if present; otherwise, backs off for 1 hour by default.
+        """
+        text = f"{stdout or ''}\n{stderr or ''}".lower()
+        if not text:
+            return None
+
+        if ("limit reached" in text) or ("rate limit" in text) or ("quota" in text):
+            # Try to parse explicit reset time like "resets 6pm" or "resets 18:00"
+            reset_at: Optional[datetime] = None
+
+            # Pattern: resets 6pm / 6 pm / 6:30pm / 18:00
+            m = re.search(r"resets\s+([0-9]{1,2})(?::([0-9]{2}))?\s*(am|pm)?", text)
+            now = datetime.now()
+            if m:
+                hour = int(m.group(1))
+                minute = int(m.group(2) or 0)
+                ampm = m.group(3)
+                if ampm:
+                    # Convert 12-hour to 24-hour
+                    if ampm == "pm" and hour != 12:
+                        hour += 12
+                    if ampm == "am" and hour == 12:
+                        hour = 0
+                # Build today reset time; if already passed, use tomorrow
+                candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if candidate <= now:
+                    candidate = candidate + timedelta(days=1)
+                reset_at = candidate
+            else:
+                # Fallback: if we see "5-hour limit reached", wait 5 hours
+                m2 = re.search(r"([0-9]+)\s*-?hour limit reached", text)
+                if m2:
+                    hours = int(m2.group(1))
+                    reset_at = now + timedelta(hours=hours)
+                else:
+                    # Default conservative backoff: 1 hour
+                    reset_at = now + timedelta(hours=1)
+
+            return reset_at
+
+        return None
+
+
+class ClaudeRateLimitError(Exception):
+    """Raised when Claude CLI indicates a rate/usage limit has been reached."""
+
+    def __init__(self, message: str, reset_at: Optional[datetime] = None):
+        super().__init__(message)
+        self.reset_at = reset_at
+
+    def _sanitize_json_output(self, output: str) -> str:
+        """Sanitize Claude CLI output to extract a JSON object string.
+
+        - Strips code fences like ```json ... ``` or ``` ... ```
+        - Trims whitespace and surrounding noise
+        - Attempts to extract the first balanced JSON object if extra text present
+        """
+        text = output.strip()
+
+        # Remove leading/trailing code fences
+        fence_pattern = r"^```(?:json)?\s*([\s\S]*?)\s*```$"
+        m = re.match(fence_pattern, text, re.IGNORECASE)
+        if m:
+            text = m.group(1).strip()
+
+        # If the entire text isn't pure JSON, try to extract the first JSON object
+        if not text.startswith("{") or not text.endswith("}"):
+            extracted = self._extract_first_json_object(text)
+            if extracted:
+                return extracted
+        return text
+
+    def _extract_first_json_object(self, text: str) -> str:
+        """Extract the first top-level JSON object substring from arbitrary text.
+
+        Uses brace counting to find a balanced {...} region.
+        Returns empty string if none found.
+        """
+        start = text.find("{")
+        if start == -1:
+            return ""
+        depth = 0
+        in_str = False
+        escape = False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if in_str:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == '"':
+                    in_str = True
+                elif ch == '{':
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0:
+                        return text[start : i + 1]
+        return ""
 
     def _build_plan_prompt(self, issue_dict: Dict[str, Any]) -> str:
         """Build planning prompt for Claude Code CLI."""
@@ -439,3 +571,23 @@ Please run integration tests for this implementation:
 4. **Compatibility Testing**: Test with different environments and verify backward compatibility
 
 Provide comprehensive integration test results and identify any issues."""
+
+    def _build_merge_conflict_prompt(self, conflict_summary: str) -> str:
+        """Build merge conflict resolution prompt for Claude Code CLI."""
+        return f"""# Resolve Git Merge Conflicts
+
+The repository is currently in a MERGE-CONFLICT state after attempting to merge a feature branch.
+
+## Conflict Summary
+{conflict_summary}
+
+## Task
+Using your file editing tools, resolve ALL merge conflicts in the repository:
+
+1. Open each conflicted file and remove conflict markers (<<<<<<<, =======, >>>>>>>).
+2. Integrate both sides' intent into a coherent final version with correct imports, logic, and tests.
+3. Ensure the project builds and tests still make sense (you can add/modify tests if needed).
+4. Do not perform git operations; only edit files. I will stage and commit.
+
+When finished, briefly summarize the major decisions you made per file.
+"""

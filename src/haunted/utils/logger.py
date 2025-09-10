@@ -32,6 +32,7 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None):
                 console=console, rich_tracebacks=True, tracebacks_show_locals=True
             )
         ],
+        force=True,  # Ensure reconfiguration when called again (e.g., --verbose)
     )
 
     # Add file handler if specified

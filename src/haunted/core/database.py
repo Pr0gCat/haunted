@@ -9,7 +9,7 @@ from sqlmodel import SQLModel, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from ..models import (
+from haunted.models import (
     Issue,
     Task,
     Phase,
@@ -18,8 +18,9 @@ from ..models import (
     TestType,
     IssueStatus,
     WorkflowStage,
+    PhaseStatus,
 )
-from ..utils.logger import get_logger
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -143,6 +144,61 @@ class DatabaseManager:
                 phase_list.append(phase_dict)
             return phase_list
 
+    async def get_phase_by_name(self, name: str) -> Optional[Phase]:
+        """Get phase by name."""
+        async with self.get_session() as session:
+            stmt = select(Phase).where(Phase.name == name)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+    async def set_phase_status(self, phase: Phase, status: PhaseStatus) -> dict:
+        """Update a phase status and updated_at, returning a plain dict."""
+        phase.status = status
+        phase.updated_at = datetime.now()
+
+        async with self.get_session() as session:
+            session.add(phase)
+
+        return {
+            "id": phase.id,
+            "name": phase.name,
+            "description": phase.description,
+            "branch_name": phase.branch_name,
+            "status": phase.status,
+            "created_at": phase.created_at,
+            "updated_at": phase.updated_at,
+        }
+
+    async def activate_phase(self, phase: Phase, deactivate_others: bool = False) -> dict:
+        """
+        Mark a phase as ACTIVE. Optionally set other phases to PLANNING.
+        Returns the activated phase as plain dict.
+        """
+        async with self.get_session() as session:
+            # Deactivate others first if requested
+            if deactivate_others:
+                other_stmt = select(Phase).where(Phase.id != phase.id)
+                result = await session.execute(other_stmt)
+                for other in result.scalars().all():
+                    other.status = PhaseStatus.PLANNING
+                    other.updated_at = datetime.now()
+                    session.add(other)
+
+            # Activate selected phase
+            phase.status = PhaseStatus.ACTIVE
+            phase.updated_at = datetime.now()
+            session.add(phase)
+
+        return {
+            "id": phase.id,
+            "name": phase.name,
+            "description": phase.description,
+            "branch_name": phase.branch_name,
+            "status": phase.status,
+            "created_at": phase.created_at,
+            "updated_at": phase.updated_at,
+        }
+
     # Issue operations
     async def create_issue(
         self,
@@ -175,8 +231,12 @@ class DatabaseManager:
             session.add(issue)
             await session.flush()  # Flush to get the auto-generated ID
             issue_id = issue.id
-            issue.branch_name = f"issue/{issue_id}"
+            # Compute branch name and assign while session is active
+            computed_branch_name = f"issue/{issue_id}"
+            issue.branch_name = computed_branch_name
             session.add(issue)
+            # Ensure branch_name update is flushed before leaving the session
+            await session.flush()
 
         logger.info(f"Created issue: {title}")
 
@@ -187,7 +247,8 @@ class DatabaseManager:
             "description": description,
             "priority": priority,
             "phase_id": phase_id,
-            "branch_name": issue.branch_name,
+            # Use local variable to avoid accessing detached instance attributes
+            "branch_name": computed_branch_name,
             "status": "OPEN",  # Default status
             "workflow_stage": "PLAN",  # Default stage
             "created_at": datetime.now(),
@@ -197,16 +258,22 @@ class DatabaseManager:
     async def get_issue(self, issue_id: int) -> Optional[Issue]:
         """Get issue by ID."""
         async with self.get_session() as session:
-            return await session.get(Issue, issue_id)
+            issue = await session.get(Issue, issue_id)
+            if issue:
+                # Expunge from session to avoid detached instance issues
+                session.expunge(issue)
+            return issue
 
     async def update_issue(self, issue: Issue) -> Issue:
         """Update existing issue."""
         issue.updated_at = datetime.now()
 
         async with self.get_session() as session:
-            session.add(issue)
+            # Merge the detached instance back into the session
+            merged_issue = await session.merge(issue)
+            await session.commit()
 
-        return issue
+        return merged_issue
 
     async def list_issues(
         self, status: Optional[IssueStatus] = None, phase_id: Optional[int] = None
@@ -231,8 +298,13 @@ class DatabaseManager:
             params = {}
 
             if status:
-                conditions.append("status = :status")
-                params["status"] = status
+                # Case-insensitive match to tolerate legacy uppercase rows
+                conditions.append("LOWER(status) = LOWER(:status)")
+                # Support both enum and plain string inputs
+                try:
+                    params["status"] = status.value  # Enum -> value
+                except AttributeError:
+                    params["status"] = status  # Already a string
             if phase_id:
                 conditions.append("phase_id = :phase_id")
                 params["phase_id"] = phase_id

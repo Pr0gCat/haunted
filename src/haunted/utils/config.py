@@ -7,7 +7,7 @@ import yaml
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-from .logger import get_logger
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
