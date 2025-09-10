@@ -1,12 +1,12 @@
 """Workflow engine implementing DEVELOPMENT_WORKFLOW.md."""
 
 import asyncio
-from typing import Dict, Callable, Any, TYPE_CHECKING
+from typing import Dict, Callable, Any, TYPE_CHECKING, Optional
 from datetime import datetime
 
 from haunted.models import WorkflowStage, IssueStatus
 from haunted.utils.logger import get_logger
-from haunted.core.claude_wrapper import ClaudeCodeWrapper
+from haunted.core.claude_wrapper import ClaudeCodeWrapper, ClaudeRateLimitError
 
 if TYPE_CHECKING:
     from haunted.core.database import DatabaseManager
@@ -20,15 +20,18 @@ class WorkflowEngine:
     Plan → Implement → Unit Test → Fix Issues → Integration Test → Diagnose → Done
     """
 
-    def __init__(self, db_manager: "DatabaseManager"):
+    def __init__(self, db_manager: "DatabaseManager", project_root: str = "."):
         """
         Initialize workflow engine.
 
         Args:
             db_manager: Database manager for persistence
+            project_root: Project root directory for file operations
         """
-        self.claude_wrapper = ClaudeCodeWrapper()
+        self.claude_wrapper = ClaudeCodeWrapper(project_root)
         self.db = db_manager
+        # Optional callback: (issue_id: Any, stage: str) -> None
+        self.on_stage_change: Optional[Callable[[Any, str], None]] = None
 
         # Map workflow stages to handler methods
         self.stage_handlers: Dict[WorkflowStage, Callable] = {
@@ -69,6 +72,11 @@ class WorkflowEngine:
             if "iteration_count" not in issue_dict:
                 issue_dict["iteration_count"] = 0
 
+            # Skip processing if already done
+            if issue_dict["workflow_stage"] == WorkflowStage.DONE.value:
+                logger.info(f"Issue {issue_dict['id']} is already in DONE stage")
+                return issue_dict
+
             while issue_dict["workflow_stage"] != WorkflowStage.DONE.value:
                 # Check iteration limit
                 if issue_dict["iteration_count"] >= self.max_iterations:
@@ -91,6 +99,13 @@ class WorkflowEngine:
                         f"Unknown workflow stage: {issue_dict['workflow_stage']}"
                     )
 
+                # Notify UI about entering the stage
+                if self.on_stage_change:
+                    try:
+                        self.on_stage_change(issue_dict.get("id"), current_stage.value)
+                    except Exception:
+                        pass
+
                 next_stage = await handler(issue_dict)
 
                 # Update issue stage
@@ -98,29 +113,12 @@ class WorkflowEngine:
                 issue_dict["updated_at"] = datetime.now()
                 issue_dict["iteration_count"] += 1
 
-                # Save changes to database
-                try:
-                    # Create Issue object for database update
-                    from haunted.models.issue import Issue
-                    issue_obj = Issue(
-                        id=issue_dict["id"],
-                        title=issue_dict["title"],
-                        description=issue_dict["description"],
-                        priority=issue_dict["priority"],
-                        status=issue_dict["status"],
-                        workflow_stage=issue_dict["workflow_stage"],
-                        phase_id=issue_dict.get("phase_id"),
-                        branch_name=issue_dict["branch_name"],
-                        plan=issue_dict.get("plan"),
-                        diagnosis_log=issue_dict.get("diagnosis_log"),
-                        iteration_count=issue_dict["iteration_count"],
-                        created_at=issue_dict["created_at"],
-                        updated_at=issue_dict["updated_at"]
-                    )
-                    await self.db.update_issue(issue_obj)
-                    logger.info(f"Updated issue {issue_dict['id']} to stage {next_stage.value}")
-                except Exception as db_error:
-                    logger.error(f"Failed to update issue {issue_dict['id']} in database: {db_error}")
+                # Notify UI about stage transition result
+                if self.on_stage_change:
+                    try:
+                        self.on_stage_change(issue_dict.get("id"), next_stage.value)
+                    except Exception:
+                        pass
 
                 # Small delay between stages
                 await asyncio.sleep(1)
@@ -151,6 +149,9 @@ class WorkflowEngine:
             
             return issue_dict
 
+        except ClaudeRateLimitError:
+            # Bubble up rate limit to daemon for global cooldown
+            raise
         except Exception as e:
             logger.error(f"Workflow error for issue {issue_dict['id']}: {e}")
             issue_dict["status"] = IssueStatus.BLOCKED.value
@@ -200,6 +201,8 @@ class WorkflowEngine:
             logger.info(f"Plan created for issue {issue_dict['id']}")
             return WorkflowStage.IMPLEMENT
 
+        except ClaudeRateLimitError:
+            raise
         except Exception as e:
             logger.error(f"Planning failed for issue {issue_dict['id']}: {e}")
             issue_dict["diagnosis_log"] = f"Plan generation failed: {e}"
@@ -222,6 +225,8 @@ class WorkflowEngine:
             logger.info(f"Implementation completed for issue {issue_dict['id']}")
             return WorkflowStage.UNIT_TEST
 
+        except ClaudeRateLimitError:
+            raise
         except Exception as e:
             logger.error(f"Implementation failed for issue {issue_dict['id']}: {e}")
             issue_dict["diagnosis_log"] = f"Implementation failed: {e}"
@@ -252,6 +257,8 @@ class WorkflowEngine:
                 logger.warning(f"Unit tests failed for issue {issue_dict['id']}")
                 return WorkflowStage.FIX_ISSUES
 
+        except ClaudeRateLimitError:
+            raise
         except Exception as e:
             logger.error(f"Unit testing failed for issue {issue_dict['id']}: {e}")
             issue_dict["diagnosis_log"] = f"Unit testing failed: {e}"
@@ -275,6 +282,8 @@ class WorkflowEngine:
             logger.info(f"Fixes applied for issue {issue_id}")
             return WorkflowStage.UNIT_TEST
 
+        except ClaudeRateLimitError:
+            raise
         except Exception as e:
             logger.error(f"Fix issues failed for issue {issue_id}: {e}")
             issue_dict["diagnosis_log"] = f"Fix issues failed: {e}"
@@ -302,6 +311,8 @@ class WorkflowEngine:
             issue_dict["status"] = IssueStatus.CLOSED.value
             return WorkflowStage.DONE
 
+        except ClaudeRateLimitError:
+            raise
         except Exception as e:
             logger.warning(f"Integration tests failed for issue {issue_id}: {e}")
             issue_dict["diagnosis_log"] = f"Integration tests failed: {e}"
@@ -337,6 +348,8 @@ class WorkflowEngine:
             )
             return WorkflowStage.PLAN
 
+        except ClaudeRateLimitError:
+            raise
         except Exception as e:
             logger.error(f"Diagnosis failed for issue {issue_id}: {e}")
             issue_dict["status"] = IssueStatus.BLOCKED.value

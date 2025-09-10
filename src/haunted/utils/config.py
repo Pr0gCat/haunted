@@ -1,5 +1,6 @@
 """Configuration management for Haunted."""
 
+import os
 from pathlib import Path
 from typing import Dict, Any
 import yaml
@@ -14,7 +15,7 @@ logger = get_logger(__name__)
 class DatabaseConfig(BaseModel):
     """Database configuration."""
 
-    url: str = Field(default="sqlite:////.haunted/haunted.db")
+    url: str = Field(default=None)
     echo: bool = Field(default=False)
 
 
@@ -67,9 +68,14 @@ class ConfigManager:
         Initialize config manager.
 
         Args:
-            project_root: Project root directory
+            project_root: Project root directory (defaults to current working directory)
         """
-        self.project_root = Path(project_root)
+        # Always use absolute path based on current working directory
+        if project_root == ".":
+            self.project_root = Path(os.getcwd())
+        else:
+            self.project_root = Path(project_root).resolve()
+        
         self.haunted_dir = self.project_root / ".haunted"
         self.config_file = self.haunted_dir / "config.yaml"
         self.env_file = self.project_root / ".env"
@@ -137,7 +143,7 @@ class ConfigManager:
             config_dict["database"]["url"] = f"sqlite:///{self.haunted_dir}/haunted.db"
 
             config = HauntedConfig(**config_dict)
-            logger.info(f"Configuration loaded from {self.config_file}")
+            logger.debug(f"Configuration loaded from {self.config_file}")
             return config
 
         except Exception as e:

@@ -87,6 +87,10 @@ uvx haunted phase create "Phase 1 - Core Features" --description "Essential feat
 
 # Channel additional requests into specific phases
 uvx haunted issue create "Add password reset" --phase <phase-id> --priority medium
+
+# Switch working context to a phase (checkout + mark active)
+uvx haunted phase switch <phase-id|phase-name>
+uvx haunted phase switch "Phase 1 - Core Features" --no-deactivate-others
 ```
 
 ### 3. Release the Autonomous Spirit
@@ -150,6 +154,7 @@ Haunted implements the development workflow from `docs/DEVELOPMENT_WORKFLOW.md`:
 
 - `uvx haunted phase create <name>` - Create new phase
 - `uvx haunted phase list` - List all phases
+- `uvx haunted phase switch <id|name> [--no-deactivate-others]` - Checkout the phase branch and mark it active (by default deactivates others)
 
 ## Configuration
 
