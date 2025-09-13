@@ -1,4 +1,4 @@
-# 👻 Haunted - Spectral Software Solutions
+# 👻 Haunted CLI - Spectral Software Solutions
 
 **Your codebase just got possessed by supernatural development powers.**
 
@@ -6,45 +6,40 @@ Transform your development workflow with an autonomous AI spirit that thinks, co
 
 **🌙 No API Séance Required** - Seamlessly channels your Claude Code authentication for effortless spectral integration.
 
-[繁體中文 README](README_zh-TW.md) | [English](#)
+[![npm version](https://badge.fury.io/js/haunted-cli.svg)](https://badge.fury.io/js/haunted-cli)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-43853D?logo=node.js&logoColor=white)](https://nodejs.org/)
 
 ## 🔮 Supernatural Features
 
 - **👻 Spectral Authentication**: No API keys needed - channels your Claude Code powers directly
 - **🎭 Autonomous Possession**: AI takes complete ownership of features from concept to deployment
 - **🌙 Concurrent Hauntings**: Multiple issues developed simultaneously across your codebase
-- **🕯️ Self-Exorcising**: When bugs appear, the spirit debugs and fixes itself automatically  
+- **🕯️ Self-Exorcising**: When bugs appear, the spirit debugs and fixes itself automatically
 - **🦇 Git Manifestation**: Automatic branch creation, testing, and merging with ghostly precision
 - **👺 Issue-Driven Séances**: All development starts from clear issue descriptions and priorities
 - **🎃 Spectral Workflow**: Complete development lifecycle - Plan → Code → Test → Debug → Ship
+- **📡 MCP Integration**: Model Context Protocol server for direct Claude communication
 
 ## 🕯️ Summoning Requirements
 
-- **Python 3.10+** - The vessel for spectral powers
-- **Node.js 18+** - Required for Claude Code channeling
-- **Claude Code CLI** - Your gateway to the supernatural realm:
-
-```bash
-# Install Claude Code CLI
-npm install -g @anthropic-ai/claude-code
-
-# Authenticate with the spirit realm (this opens the portal!)
-claude login
-```
+- **Node.js 20+** - The vessel for spectral powers (TypeScript edition)
+- **Claude Code CLI** - Your gateway to the supernatural realm
 
 ## 🎭 Possession Ritual
 
 ```bash
-# Instant spectral possession (recommended)
-uvx haunted
+# Global spectral possession
+npm install -g haunted-cli
 
-# Or summon globally with pipx
-pipx install haunted
+# Or channel directly with npx
+npx haunted-cli
 
 # For development possession
 git clone <repository-url>
 cd haunted
-uv sync
+npm install
+npm run build
 ```
 
 **🌙 The possession is complete!** No API keys needed - Haunted channels your Claude Code authentication automatically.
@@ -53,10 +48,10 @@ uv sync
 
 ```bash
 # Test the spectral connection
-uvx haunted --help
-
-# For pipx installation
 haunted --help
+
+# Or with npx
+npx haunted-cli --help
 ```
 
 ## 🌙 Summoning Your Spectral Developer
@@ -65,9 +60,6 @@ haunted --help
 
 ```bash
 # Invite the spirit into your project
-uvx haunted init
-
-# Or if globally installed with pipx
 haunted init
 ```
 
@@ -80,20 +72,20 @@ This spectral ritual will:
 
 ```bash
 # Communicate your high-priority wish to the spirit
-uvx haunted issue create "Implement user authentication" --priority high --description "Add login/logout functionality with JWT tokens"
+haunted issue create "Implement user authentication" --priority high --description "Add login/logout functionality with JWT tokens"
 
 # Organize supernatural work into phases
-uvx haunted phase create "Phase 1 - Core Features" --description "Essential features for MVP"
+haunted phase create "Phase 1 - Core Features" --description "Essential features for MVP"
 
 # Channel additional requests into specific phases
-uvx haunted issue create "Add password reset" --phase <phase-id> --priority medium
+haunted issue create "Add password reset" --phase <phase-id> --priority medium
 ```
 
 ### 3. Release the Autonomous Spirit
 
 ```bash
 # Unleash your spectral developer
-uvx haunted start
+haunted start
 ```
 
 Your ghostly assistant will:
@@ -106,16 +98,16 @@ Your ghostly assistant will:
 
 ```bash
 # Check overall status
-uvx haunted status
+haunted status
 
 # List all issues
-uvx haunted issue list
+haunted issue list
 
 # View specific issue details
-uvx haunted issue show <issue-id>
+haunted issue show <issue-id>
 
 # View issues by status
-uvx haunted issue list --status in_progress
+haunted issue list --status in_progress
 ```
 
 ## Workflow
@@ -134,58 +126,65 @@ Haunted implements the development workflow from `docs/DEVELOPMENT_WORKFLOW.md`:
 
 ### Core Commands
 
-- `uvx haunted init` - Initialize Haunted in current project
-- `uvx haunted start` - Start the AI daemon
-- `uvx haunted stop` - Stop the daemon
-- `uvx haunted status` - Show current status
+- `haunted init` - Initialize Haunted in current project
+- `haunted start` - Start the AI daemon
+- `haunted stop` - Stop the daemon
+- `haunted status` - Show current status
 
 ### Issue Management
 
-- `uvx haunted issue create <title>` - Create new issue
-- `uvx haunted issue list` - List all issues
-- `uvx haunted issue show <id>` - Show issue details
-- `uvx haunted issue comment <id> <message>` - Add comment to issue
+- `haunted issue create <title>` - Create new issue
+- `haunted issue list` - List all issues
+- `haunted issue show <id>` - Show issue details
+- `haunted issue comment <id> <message>` - Add comment to issue
 
 ### Phase Management
 
-- `uvx haunted phase create <name>` - Create new phase
-- `uvx haunted phase list` - List all phases
+- `haunted phase create <name>` - Create new phase
+- `haunted phase list` - List all phases
 
 ## Configuration
 
-Configuration is stored in `.haunted/config.yaml`:
+Configuration is stored in `.haunted/config.json`:
 
-```yaml
-api:
-  # No API key needed! Uses Claude Code authentication
-  model: claude-3-5-sonnet-20241022  # Claude Code model
-  max_concurrent_issues: 3
-  rate_limit_retry: true
-
-daemon:
-  scan_interval: 30  # seconds
-  max_iterations: 3  # max workflow cycles per issue
-
-git:
-  auto_merge: true
-  auto_commit: true
-
-database:
-  url: sqlite:///.haunted/haunted.db
+```json
+{
+  "project": {
+    "name": "your-project",
+    "root": "/path/to/project"
+  },
+  "database": {
+    "url": "/path/to/.haunted/database.db"
+  },
+  "claude": {
+    "command": "claude",
+    "maxTokens": 4000,
+    "temperature": 0.7
+  },
+  "workflow": {
+    "autoProcess": true,
+    "checkInterval": 30000,
+    "maxRetries": 3
+  },
+  "logging": {
+    "level": "info"
+  }
+}
 ```
 
 ## Architecture
 
 ```
-haunted/
+src/
 ├── cli/           # Command-line interface
-├── core/          # Core business logic
-│   ├── claude_wrapper.py # Claude Code SDK integration
-│   ├── workflow.py       # Workflow engine
-│   ├── database.py       # Database management
-│   └── git_manager.py    # Git operations
-├── models/        # SQLModel data models
-├── daemon/        # Background service
+├── commands/      # Individual command implementations
+├── services/      # Core business logic
+│   ├── claude-wrapper.ts # Claude Code CLI integration
+│   ├── workflow-engine.ts # Workflow engine
+│   ├── database.ts       # Database management
+│   ├── git-manager.ts    # Git operations
+│   └── daemon.ts         # Background service
+├── models/        # TypeScript data models
 ├── mcp/           # MCP tools for Claude
 └── utils/         # Utilities and config
 ```
@@ -221,21 +220,21 @@ Claude has access to comprehensive tools:
 ### Common Issues
 
 1. **Claude Code not authenticated**: Run `claude login` first
-2. **Claude Code not installed**: Install with `npm install -g @anthropic-ai/claude-code`
-3. **Python version < 3.10**: Upgrade to Python 3.10 or higher
+2. **Claude Code not installed**: Install from https://claude.ai/download
+3. **Node.js version < 20**: Upgrade to Node.js 20 or higher
 4. **Not a Git repository**: Run `git init` first
-5. **Database errors**: Delete `.haunted/haunted.db` and reinitialize
+5. **Database errors**: Delete `.haunted/database.db` and reinitialize
 
 ### Logs
 
 Enable verbose logging:
 ```bash
-uvx haunted --verbose start
+haunted --verbose start
 ```
 
 Or specify log file:
 ```bash
-uvx haunted --log-file haunted.log start
+haunted --log-file haunted.log start
 ```
 
 ## Examples
@@ -244,31 +243,31 @@ uvx haunted --log-file haunted.log start
 
 ```bash
 # Initialize project
-uvx haunted init
+haunted init
 
 # Create issues
-uvx haunted issue create "Add user model" --priority high
-uvx haunted issue create "Implement API endpoints" --priority high
-uvx haunted issue create "Add input validation" --priority medium
+haunted issue create "Add user model" --priority high
+haunted issue create "Implement API endpoints" --priority high
+haunted issue create "Add input validation" --priority medium
 
 # Start AI processing
-uvx haunted start
+haunted start
 
 # Monitor progress
-watch uvx haunted status
+watch haunted status
 ```
 
 ### Issue Management
 
 ```bash
 # View issue details
-uvx haunted issue show abc123
+haunted issue show abc123
 
 # Add clarification comment
-uvx haunted issue comment abc123 "Please use bcrypt for password hashing"
+haunted issue comment abc123 "Please use bcrypt for password hashing"
 
 # Check all open issues
-uvx haunted issue list --status open
+haunted issue list --status open
 ```
 
 ## Contributing

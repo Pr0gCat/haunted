@@ -1,0 +1,120 @@
+{
+  "name": "haunted-cli",
+  "version": "0.2.0",
+  "description": "👻 Spectral Software Solutions - AI-powered development with automated workflow management for Claude Code",
+  "author": "ProgCat <progcat@protonmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://github.com/progcat/haunted",
+  "bugs": "https://github.com/progcat/haunted/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/progcat/haunted.git"
+  },
+  "keywords": [
+    "ai",
+    "development",
+    "automation",
+    "workflow",
+    "claude",
+    "claude-code",
+    "mcp",
+    "spectral",
+    "haunted",
+    "cli"
+  ],
+  "bin": {
+    "haunted": "./bin/haunted.mjs"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      }
+    },
+    "./lib": {
+      "require": {
+        "types": "./dist/lib.d.cts",
+        "default": "./dist/lib.cjs"
+      },
+      "import": {
+        "types": "./dist/lib.d.mts",
+        "default": "./dist/lib.mjs"
+      }
+    },
+    "./mcp": {
+      "require": {
+        "types": "./dist/mcp/index.d.cts",
+        "default": "./dist/mcp/index.cjs"
+      },
+      "import": {
+        "types": "./dist/mcp/index.d.mts",
+        "default": "./dist/mcp/index.mjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/cli/index.ts",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "prepublishOnly": "bun run clean && bun run build",
+    "postinstall": "node ./scripts/postinstall.mjs || true"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.7",
+    "execa": "^9.5.2",
+    "ora": "^8.1.1",
+    "simple-git": "^3.27.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
+    "winston": "^3.17.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.1",
+    "@typescript-eslint/parser": "^8.18.1",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "prisma": "^5.22.0",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "packageManager": "bun@1.1.0"
+}
