@@ -71,7 +71,7 @@ export async function initCommand(): Promise<void> {
     console.log(chalk.cyan('  2. Create an issue: ') + chalk.white('haunted issue create "Implement feature"'));
     console.log(chalk.cyan('  3. Start the daemon:') + chalk.white('haunted start'));
     console.log('');
-    console.log(chalk.dim('Note: Haunted uses Claude Code CLI - no API key required!'));
+    console.log(chalk.dim('Note: Haunted uses Claude Code CLI'));
 
   } catch (error) {
     spinner.fail('Initialization failed');
