@@ -4,12 +4,12 @@ import asyncio
 from typing import Dict, Callable, Any, TYPE_CHECKING
 from datetime import datetime
 
-from ..models import WorkflowStage, IssueStatus
-from ..utils.logger import get_logger
-from .claude_wrapper import ClaudeCodeWrapper
+from haunted.models import WorkflowStage, IssueStatus
+from haunted.utils.logger import get_logger
+from haunted.core.claude_wrapper import ClaudeCodeWrapper
 
 if TYPE_CHECKING:
-    from .database import DatabaseManager
+    from haunted.core.database import DatabaseManager
 
 logger = get_logger(__name__)
 

@@ -5,8 +5,8 @@ from pathlib import Path
 from git import Repo, InvalidGitRepositoryError
 from git.exc import GitCommandError
 
-from ..models import Issue, Phase, Task
-from ..utils.logger import get_logger
+from haunted.models import Issue, Phase, Task
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

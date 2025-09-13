@@ -7,11 +7,11 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
-from ..utils.config import get_config_manager, load_config
-from ..utils.logger import setup_logging, get_logger
-from ..core.database import DatabaseManager
-from ..core.git_manager import GitManager
-from ..models import WorkflowStage
+from haunted.utils.config import get_config_manager, load_config
+from haunted.utils.logger import setup_logging, get_logger
+from haunted.core.database import DatabaseManager
+from haunted.core.git_manager import GitManager
+from haunted.models import WorkflowStage
 
 console = Console()
 logger = get_logger(__name__)
@@ -78,7 +78,7 @@ def init():
 
         # Check Claude Code CLI availability
         console.print("[cyan]Checking Claude Code CLI...[/cyan]")
-        from ..core.claude_wrapper import ClaudeCodeWrapper
+        from haunted.core.claude_wrapper import ClaudeCodeWrapper
 
         wrapper = ClaudeCodeWrapper()
 
@@ -142,7 +142,7 @@ def start(background):
             return
 
         # Start updated daemon with Claude Code integration
-        from ..daemon.service_updated import HauntedDaemonUpdated
+        from haunted.daemon.service_updated import HauntedDaemonUpdated
 
         daemon = HauntedDaemonUpdated(config)
         asyncio.run(daemon.start())

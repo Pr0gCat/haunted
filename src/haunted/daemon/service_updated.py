@@ -5,11 +5,11 @@ import signal
 from typing import List, Dict, Any
 from datetime import datetime
 
-from ..core.workflow import WorkflowEngine
-from ..core.database import DatabaseManager
-from ..core.git_manager import GitManager
-from ..utils.config import HauntedConfig
-from ..utils.logger import get_logger
+from haunted.core.workflow import WorkflowEngine
+from haunted.core.database import DatabaseManager
+from haunted.core.git_manager import GitManager
+from haunted.utils.config import HauntedConfig
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

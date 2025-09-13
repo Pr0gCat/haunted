@@ -7,7 +7,7 @@ from sqlmodel import SQLModel, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from ..models import (
+from haunted.models import (
     Issue,
     Task,
     Phase,
@@ -16,8 +16,9 @@ from ..models import (
     TestType,
     IssueStatus,
     WorkflowStage,
+    Priority,
 )
-from ..utils.logger import get_logger
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -90,8 +91,11 @@ class DatabaseManager:
             session.add(phase)
             await session.flush()  # Flush to get the auto-generated ID
             phase_id = phase.id
+            phase_status = phase.status.value if hasattr(phase.status, 'value') else str(phase.status)
+            phase_created_at = phase.created_at
+            phase_updated_at = phase.updated_at
 
-        logger.info(f"Created phase: {name}")
+        logger.info(f"Created phase: {name} with ID: {phase_id}")
 
         # Return as dictionary to avoid session issues
         return {
@@ -99,9 +103,9 @@ class DatabaseManager:
             "name": name,
             "description": description,
             "branch_name": branch_name,
-            "status": "PLANNING",  # Default status
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
+            "status": phase_status,
+            "created_at": phase_created_at,
+            "updated_at": phase_updated_at,
         }
 
     async def get_phase(self, phase_id: int) -> Optional[Phase]:
@@ -154,10 +158,16 @@ class DatabaseManager:
         Returns:
             Created issue as dictionary
         """
+        # Convert string priority to Priority enum
+        if isinstance(priority, str):
+            priority_enum = Priority(priority.lower())
+        else:
+            priority_enum = priority
+            
         issue = Issue(
             title=title,
             description=description,
-            priority=priority,
+            priority=priority_enum,
             phase_id=phase_id,
             branch_name="temp",  # Temporary value, will update after getting ID
         )
@@ -168,21 +178,30 @@ class DatabaseManager:
             issue_id = issue.id
             issue.branch_name = f"issue/{issue_id}"
             session.add(issue)
+            await session.flush()  # Flush again after branch_name update
+            
+            # Get the final values from the persisted object
+            final_priority = issue.priority.value if hasattr(issue.priority, 'value') else str(issue.priority)
+            final_status = issue.status.value if hasattr(issue.status, 'value') else str(issue.status)
+            final_workflow_stage = issue.workflow_stage.value if hasattr(issue.workflow_stage, 'value') else str(issue.workflow_stage)
+            final_branch_name = issue.branch_name
+            final_created_at = issue.created_at
+            final_updated_at = issue.updated_at
 
-        logger.info(f"Created issue: {title}")
+        logger.info(f"Created issue: {title} with ID: {issue_id}")
 
         # Return as dictionary to avoid session issues
         return {
             "id": issue_id,
             "title": title,
             "description": description,
-            "priority": priority,
+            "priority": final_priority,
             "phase_id": phase_id,
-            "branch_name": issue.branch_name,
-            "status": "OPEN",  # Default status
-            "workflow_stage": "PLAN",  # Default stage
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
+            "branch_name": final_branch_name,
+            "status": final_status,
+            "workflow_stage": final_workflow_stage,
+            "created_at": final_created_at,
+            "updated_at": final_updated_at,
         }
 
     async def get_issue(self, issue_id: int) -> Optional[Issue]:
@@ -252,7 +271,7 @@ class DatabaseManager:
                 issue_list.append(issue_dict)
             return issue_list
 
-    async def get_open_issues_by_priority(self) -> List[Issue]:
+    async def get_open_issues_by_priority(self) -> List[dict]:
         """Get open issues ordered by priority."""
         return await self.list_issues(status=IssueStatus.OPEN)
 
@@ -270,7 +289,7 @@ class DatabaseManager:
         async with self.get_session() as session:
             stmt = select(Task).where(Task.issue_id == issue_id)
             result = await session.execute(stmt)
-            return result.scalars().all()
+            return list(result.scalars().all())
 
     async def update_task(self, task: Task) -> Task:
         """Update existing task."""
@@ -300,7 +319,7 @@ class DatabaseManager:
                 .order_by(Comment.created_at)
             )
             result = await session.execute(stmt)
-            return result.scalars().all()
+            return list(result.scalars().all())
 
     # Test result operations
     async def create_test_result(self, test_result: TestResult) -> TestResult:
@@ -333,7 +352,7 @@ class DatabaseManager:
             stmt = stmt.order_by(TestResult.timestamp.desc())
 
             result = await session.execute(stmt)
-            return result.scalars().all()
+            return list(result.scalars().all())
 
     # Statistics and queries
     async def get_issue_stats(self) -> dict:

@@ -4,13 +4,13 @@ import asyncio
 import signal
 from typing import List, Dict
 
-from ..core.workflow import WorkflowEngine
-from ..core.claude_wrapper import ClaudeCodeWrapper
-from ..core.database import DatabaseManager
-from ..core.git_manager import GitManager
-from ..models import Issue, IssueStatus, WorkflowStage
-from ..utils.config import HauntedConfig
-from ..utils.logger import get_logger
+from haunted.core.workflow import WorkflowEngine
+from haunted.core.claude_wrapper import ClaudeCodeWrapper
+from haunted.core.database import DatabaseManager
+from haunted.core.git_manager import GitManager
+from haunted.models import Issue, IssueStatus, WorkflowStage
+from haunted.utils.config import HauntedConfig
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -34,7 +34,7 @@ class HauntedDaemon:
         self.db_manager = DatabaseManager(config.database.url)
         self.git_manager = GitManager(config.project_root)
         self.agent = ClaudeCodeWrapper()
-        self.workflow_engine = WorkflowEngine(self.agent, self.db_manager)
+        self.workflow_engine = WorkflowEngine(self.db_manager)
 
         # Track active issues to prevent duplicates
         self.active_issues: Dict[str, asyncio.Task] = {}

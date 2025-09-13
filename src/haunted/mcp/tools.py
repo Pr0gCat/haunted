@@ -4,10 +4,10 @@ import subprocess
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
-from ..core.database import DatabaseManager
-from ..core.git_manager import GitManager
-from ..models import Task
-from ..utils.logger import get_logger
+from haunted.core.database import DatabaseManager
+from haunted.core.git_manager import GitManager
+from haunted.models import Task
+from haunted.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -159,14 +159,15 @@ class MCPToolHandler:
 
     # Command execution
     async def run_command(
-        self, command: str, cwd: Optional[str] = None
+        self, command: str, cwd: Optional[str] = None, timeout: float = 60.0
     ) -> Dict[str, Any]:
         """
-        Run shell command.
+        Run shell command with configurable timeout.
 
         Args:
             command: Command to execute
             cwd: Working directory (defaults to project root)
+            timeout: Command timeout in seconds (default: 60s)
 
         Returns:
             Command result with stdout, stderr, and return code
@@ -183,7 +184,7 @@ class MCPToolHandler:
                 cwd=work_dir,
                 capture_output=True,
                 text=True,
-                timeout=60,  # 1 minute timeout
+                timeout=timeout,
             )
 
             return {
@@ -192,15 +193,17 @@ class MCPToolHandler:
                 "return_code": result.returncode,
                 "command": command,
                 "cwd": str(work_dir),
+                "timeout_used": timeout,
             }
 
         except subprocess.TimeoutExpired:
             return {
                 "stdout": "",
-                "stderr": "Command timed out after 60 seconds",
+                "stderr": f"Command timed out after {timeout} seconds",
                 "return_code": -1,
                 "command": command,
                 "cwd": str(work_dir),
+                "timeout_used": timeout,
             }
 
     # Git operations
@@ -360,7 +363,7 @@ class MCPToolHandler:
         Returns:
             Task ID
         """
-        from ..models import TaskStatus
+        from haunted.models import TaskStatus
 
         task = Task(
             # id will be auto-generated
