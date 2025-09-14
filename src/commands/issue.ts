@@ -27,7 +27,7 @@ export const issueCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
       const gitManager = new GitManager();
 
       await dbManager.initialize();
@@ -65,7 +65,7 @@ export const issueCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
 
       await dbManager.initialize();
       let issues = await dbManager.listIssues(options.status);
@@ -141,7 +141,7 @@ export const issueCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
 
       await dbManager.initialize();
       const issue = await dbManager.getIssue(id);
@@ -204,7 +204,7 @@ export const issueCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
 
       await dbManager.initialize();
       await dbManager.addComment(id, 'user', message);
@@ -225,7 +225,7 @@ export const issueCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
 
       await dbManager.initialize();
 
@@ -260,7 +260,7 @@ export const issueCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
 
       await dbManager.initialize();
 
@@ -302,7 +302,7 @@ export const issueCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
 
       await dbManager.initialize();
 
@@ -336,7 +336,7 @@ export const issueCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
 
       await dbManager.initialize();
 

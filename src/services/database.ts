@@ -63,7 +63,7 @@ export class DatabaseManager {
     // Issues table
     await this.db.exec(`
       CREATE TABLE IF NOT EXISTS issues (
-        id TEXT PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT DEFAULT '',
         priority TEXT NOT NULL DEFAULT 'medium',
@@ -176,17 +176,25 @@ export class DatabaseManager {
     priority: 'low' | 'medium' | 'high' | 'critical' = 'medium',
     phaseId?: string
   ): Promise<Issue> {
-    const id = randomUUID();
-    const branchName = `issue/${title.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 40)}`;
+    // Create a temporary branch name, will update after getting the ID
+    const tempBranchName = 'temp';
+
+    const result = await this.db.run(`
+      INSERT INTO issues (title, description, priority, phase_id, branch_name)
+      VALUES (?, ?, ?, ?, ?)
+    `, [title, description, priority, phaseId, tempBranchName]);
+
+    // Now update with the proper branch name including the issue number
+    const issueId = result.lastID;
+    const branchName = `issue/${issueId}-${title.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 40)}`;
 
     await this.db.run(`
-      INSERT INTO issues (id, title, description, priority, phase_id, branch_name)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [id, title, description, priority, phaseId, branchName]);
+      UPDATE issues SET branch_name = ? WHERE id = ?
+    `, [branchName, issueId]);
 
     const issue = await this.db.get(`
       SELECT * FROM issues WHERE id = ?
-    `, [id]);
+    `, [issueId]);
 
     return this.mapIssue(issue);
   }
@@ -215,29 +223,34 @@ export class DatabaseManager {
   }
 
   async getIssue(id: string): Promise<Issue | null> {
+    // Try to parse as number first for serial IDs
+    const numId = parseInt(id);
     const row = await this.db.get(`
-      SELECT * FROM issues WHERE id = ? OR id LIKE ?
-    `, [id, `${id}%`]);
+      SELECT * FROM issues WHERE id = ? OR CAST(id AS TEXT) LIKE ?
+    `, [isNaN(numId) ? id : numId, `${id}%`]);
 
     return row ? this.mapIssue(row) : null;
   }
 
   async updateIssueStatus(id: string, status: string): Promise<void> {
+    const numId = parseInt(id);
     await this.db.run(`
       UPDATE issues SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-    `, [status, id]);
+    `, [status, isNaN(numId) ? id : numId]);
   }
 
   async updateIssueWorkflowStage(id: string, stage: WorkflowStage): Promise<void> {
+    const numId = parseInt(id);
     await this.db.run(`
       UPDATE issues SET workflow_stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-    `, [stage, id]);
+    `, [stage, isNaN(numId) ? id : numId]);
   }
 
   async updateIssuePlan(id: string, plan: string): Promise<void> {
+    const numId = parseInt(id);
     await this.db.run(`
       UPDATE issues SET plan = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-    `, [plan, id]);
+    `, [plan, isNaN(numId) ? id : numId]);
   }
 
   // Comment operations
@@ -312,7 +325,7 @@ export class DatabaseManager {
 
   private mapIssue(row: any): Issue {
     return {
-      id: row.id,
+      id: String(row.id),
       title: row.title,
       description: row.description,
       priority: row.priority,

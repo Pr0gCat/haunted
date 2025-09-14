@@ -10,18 +10,6 @@ import type { HauntedConfig } from '../models/index.js';
 import { logger } from './logger.js';
 
 const ConfigSchema = z.object({
-  project: z.object({
-    name: z.string(),
-    root: z.string()
-  }),
-  database: z.object({
-    url: z.string()
-  }),
-  claude: z.object({
-    command: z.string(),
-    maxTokens: z.number().optional(),
-    temperature: z.number().optional()
-  }),
   workflow: z.object({
     autoProcess: z.boolean(),
     checkInterval: z.number(),
@@ -54,29 +42,14 @@ export class ConfigManager {
   }
 
   createDefaultConfig(): HauntedConfig {
-    const projectRoot = process.cwd();
-    const projectName = path.basename(projectRoot);
-
     const config: HauntedConfig = {
-      project: {
-        name: projectName,
-        root: projectRoot
-      },
-      database: {
-        url: path.join(this.configDir, 'database.db')
-      },
-      claude: {
-        command: 'claude',
-        maxTokens: 4000,
-        temperature: 0.7
-      },
       workflow: {
         autoProcess: true,
-        checkInterval: 30000, // 30 seconds
+        checkInterval: 5000, // 30 seconds
         maxRetries: 3
       },
       logging: {
-        level: 'info'
+        level: 'debug'
       }
     };
 
@@ -149,9 +122,6 @@ export class ConfigManager {
 
   private mergeConfig(base: HauntedConfig, overrides: Partial<HauntedConfig>): HauntedConfig {
     return {
-      project: { ...base.project, ...overrides.project },
-      database: { ...base.database, ...overrides.database },
-      claude: { ...base.claude, ...overrides.claude },
       workflow: { ...base.workflow, ...overrides.workflow },
       logging: { ...base.logging, ...overrides.logging }
     };
@@ -163,6 +133,14 @@ export class ConfigManager {
 
   getConfigDir(): string {
     return this.configDir;
+  }
+
+  getDatabasePath(): string {
+    return path.join(this.configDir, 'database.db');
+  }
+
+  getProjectRoot(): string {
+    return process.cwd();
   }
 
   async deleteConfig(): Promise<void> {

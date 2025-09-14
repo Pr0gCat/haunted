@@ -16,68 +16,97 @@ export class WorkflowEngine {
   ) {}
 
   async processIssue(issue: Issue): Promise<any> {
-    logger.info(`Processing issue ${issue.id}: ${issue.title}`);
+    const startTime = new Date();
+    logger.info(`[WorkflowEngine] Processing issue ${issue.id}: ${issue.title} at stage '${issue.workflowStage}'`);
 
     try {
+      let result;
+
       switch (issue.workflowStage) {
         case 'pending':
-          return await this.startAnalysis(issue);
+          logger.debug(`[WorkflowEngine] Starting analysis phase for issue ${issue.id}`);
+          result = await this.startAnalysis(issue);
+          break;
 
         case 'analyzing':
-          return await this.generatePlan(issue);
+          logger.debug(`[WorkflowEngine] Starting plan generation phase for issue ${issue.id}`);
+          result = await this.generatePlan(issue);
+          break;
 
         case 'planning':
-          return await this.startImplementation(issue);
+          logger.debug(`[WorkflowEngine] Starting implementation phase for issue ${issue.id}`);
+          result = await this.startImplementation(issue);
+          break;
 
         case 'implementing':
-          return await this.runTests(issue);
+          logger.debug(`[WorkflowEngine] Starting testing phase for issue ${issue.id}`);
+          result = await this.runTests(issue);
+          break;
 
         case 'testing':
-          return await this.reviewChanges(issue);
+          logger.debug(`[WorkflowEngine] Starting review phase for issue ${issue.id}`);
+          result = await this.reviewChanges(issue);
+          break;
 
         case 'reviewing':
-          return await this.completeIssue(issue);
+          logger.debug(`[WorkflowEngine] Starting completion phase for issue ${issue.id}`);
+          result = await this.completeIssue(issue);
+          break;
 
         case 'completed':
-          logger.info(`Issue ${issue.id} is already completed`);
-          return { status: 'completed', message: 'Issue is already completed' };
+          logger.info(`[WorkflowEngine] Issue ${issue.id} is already completed - skipping`);
+          result = { status: 'completed', message: 'Issue is already completed' };
+          break;
 
         case 'failed':
-          return await this.retryIssue(issue);
+          logger.debug(`[WorkflowEngine] Retrying failed issue ${issue.id}`);
+          result = await this.retryIssue(issue);
+          break;
 
         default:
           throw new Error(`Unknown workflow stage: ${issue.workflowStage}`);
       }
+
+      const processingTime = new Date().getTime() - startTime.getTime();
+      logger.info(`[WorkflowEngine] Completed processing issue ${issue.id} in ${processingTime}ms - Result: ${result.status}`);
+
+      return result;
     } catch (error) {
-      logger.error(`Workflow processing failed for issue ${issue.id}:`, error);
+      const processingTime = new Date().getTime() - startTime.getTime();
+      logger.error(`[WorkflowEngine] Processing failed for issue ${issue.id} after ${processingTime}ms:`, error);
       await this.handleFailure(issue, error);
       throw error;
     }
   }
 
   private async startAnalysis(issue: Issue): Promise<any> {
-    logger.info(`Starting analysis for issue ${issue.id}`);
+    logger.info(`[WorkflowEngine] Starting analysis for issue ${issue.id}`);
 
+    logger.debug(`[WorkflowEngine] Updating workflow stage to ANALYZING for issue ${issue.id}`);
     await this.updateWorkflowStage(issue.id, WorkflowStage.ANALYZING);
 
     try {
       // Switch to issue branch
+      logger.debug(`[WorkflowEngine] Switching to branch '${issue.branchName}' for issue ${issue.id}`);
       await this.git.switchToBranch(issue.branchName);
 
       // Analyze the issue
+      logger.debug(`[WorkflowEngine] Starting Claude analysis for issue ${issue.id}`);
       const analysis = await this.claude.analyzeAndPlan(issue);
 
       if (analysis.error) {
         throw new Error(`Analysis failed: ${analysis.error}`);
       }
 
+      logger.debug(`[WorkflowEngine] Analysis successful, saving plan for issue ${issue.id}`);
       // Save analysis results
       await this.db.updateIssuePlan(issue.id, JSON.stringify(analysis, null, 2));
 
       // Move to planning stage
+      logger.debug(`[WorkflowEngine] Moving issue ${issue.id} to PLANNING stage`);
       await this.updateWorkflowStage(issue.id, WorkflowStage.PLANNING);
 
-      logger.info(`Analysis completed for issue ${issue.id}`);
+      logger.info(`[WorkflowEngine] Analysis completed for issue ${issue.id}`);
 
       return {
         status: 'analysis_complete',
@@ -86,6 +115,7 @@ export class WorkflowEngine {
       };
 
     } catch (error) {
+      logger.error(`[WorkflowEngine] Analysis failed for issue ${issue.id}:`, error);
       await this.handleFailure(issue, error);
       throw error;
     }
@@ -240,30 +270,42 @@ export class WorkflowEngine {
   }
 
   private async runTests(issue: Issue): Promise<any> {
-    logger.info(`Running tests for issue ${issue.id}`);
+    logger.info(`[WorkflowEngine] Running tests for issue ${issue.id}`);
 
     try {
       // Check for common test commands
       const testCommands = ['npm test', 'npm run test', 'yarn test', 'bun test'];
       let testResult = null;
 
+      logger.debug(`[WorkflowEngine] Attempting to run tests using common test commands for issue ${issue.id}`);
+
       for (const command of testCommands) {
         try {
+          logger.debug(`[WorkflowEngine] Trying test command: ${command} for issue ${issue.id}`);
           const result = await this.claude.executeDiagnosticCommand(command);
           if (result.success) {
+            logger.debug(`[WorkflowEngine] Test command '${command}' succeeded for issue ${issue.id}`);
             testResult = result;
             break;
+          } else {
+            logger.debug(`[WorkflowEngine] Test command '${command}' failed for issue ${issue.id}: ${result.stderr}`);
           }
         } catch (error) {
+          logger.debug(`[WorkflowEngine] Test command '${command}' threw error for issue ${issue.id}: ${error}`);
           // Continue to next test command
           continue;
         }
       }
 
+      if (!testResult) {
+        logger.warn(`[WorkflowEngine] No test commands succeeded for issue ${issue.id}`);
+      }
+
       // Move to review stage
+      logger.debug(`[WorkflowEngine] Moving issue ${issue.id} to REVIEWING stage`);
       await this.updateWorkflowStage(issue.id, WorkflowStage.REVIEWING);
 
-      logger.info(`Tests completed for issue ${issue.id}`);
+      logger.info(`[WorkflowEngine] Tests completed for issue ${issue.id} (success: ${!!testResult})`);
 
       return {
         status: 'tests_complete',
@@ -272,6 +314,7 @@ export class WorkflowEngine {
       };
 
     } catch (error) {
+      logger.error(`[WorkflowEngine] Test execution failed for issue ${issue.id}:`, error);
       await this.handleFailure(issue, error);
       throw error;
     }

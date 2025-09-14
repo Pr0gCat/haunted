@@ -58,7 +58,7 @@ export async function initCommand(): Promise<void> {
 
     // Initialize database
     spinner.start('Setting up database...');
-    const dbManager = new DatabaseManager(config.database.url);
+    const dbManager = new DatabaseManager(configManager.getDatabasePath());
     await dbManager.initialize();
     spinner.succeed('Database initialized');
 

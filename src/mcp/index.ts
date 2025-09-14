@@ -18,7 +18,6 @@ import { ClaudeCodeWrapper } from '../services/claude-wrapper.js';
 import { WorkflowEngine } from '../services/workflow-engine.js';
 import { ConfigManager } from '../utils/config.js';
 import { logger } from '../utils/logger.js';
-import type { HauntedConfig } from '../models/index.js';
 
 export class HauntedMCPServer {
   private server: Server;
@@ -26,7 +25,6 @@ export class HauntedMCPServer {
   private git!: GitManager;
   private claude!: ClaudeCodeWrapper;
   private workflow!: WorkflowEngine;
-  private config!: HauntedConfig;
 
   constructor() {
     this.server = new Server(
@@ -50,15 +48,15 @@ export class HauntedMCPServer {
   private async initialize(): Promise<void> {
     try {
       const configManager = new ConfigManager();
-      this.config = configManager.loadConfig();
+      configManager.loadConfig(); // Load config but we don't need to store it
 
-      this.db = new DatabaseManager(this.config.database.url);
+      this.db = new DatabaseManager(configManager.getDatabasePath());
       await this.db.initialize();
 
-      this.git = new GitManager(this.config.project.root);
+      this.git = new GitManager(configManager.getProjectRoot());
       await this.git.initialize();
 
-      this.claude = new ClaudeCodeWrapper(this.config.claude.command);
+      this.claude = new ClaudeCodeWrapper('claude');
       this.workflow = new WorkflowEngine(this.db, this.git, this.claude);
 
       logger.info('Haunted MCP Server initialized');

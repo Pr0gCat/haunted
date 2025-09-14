@@ -23,6 +23,16 @@ export async function startCommand(options: StartOptions): Promise<void> {
     // Load configuration
     const config = configManager.loadConfig();
 
+    // Setup logger with config (if not already set up by CLI)
+    import('../utils/logger.js').then(({ setupLogger }) => {
+      setupLogger({
+        level: config.logging.level,
+        file: config.logging.file
+      });
+    });
+
+    logger.info(`Starting daemon with logging level: ${config.logging.level}`);
+
     if (options.background) {
       console.log(chalk.yellow('Background mode not implemented yet.'));
       return;

@@ -15,14 +15,13 @@ export class HauntedAPI {
   private git: GitManager;
   private claude: ClaudeCodeWrapper;
   private workflow: WorkflowEngine;
-  private config: HauntedConfig;
 
   constructor(config?: Partial<HauntedConfig>) {
     const configManager = new ConfigManager();
-    this.config = configManager.loadConfig(config);
+    configManager.loadConfig(config); // Load config to apply overrides
 
-    this.db = new DatabaseManager(this.config.database.url);
-    this.git = new GitManager(this.config.project.root);
+    this.db = new DatabaseManager(configManager.getDatabasePath());
+    this.git = new GitManager(configManager.getProjectRoot());
     this.claude = new ClaudeCodeWrapper();
     this.workflow = new WorkflowEngine(this.db, this.git, this.claude);
   }

@@ -16,7 +16,7 @@ export const phaseCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
       const gitManager = new GitManager();
 
       await dbManager.initialize();
@@ -57,7 +57,7 @@ export const phaseCommands = {
     try {
       const configManager = new ConfigManager();
       const config = configManager.loadConfig();
-      const dbManager = new DatabaseManager(config.database.url);
+      const dbManager = new DatabaseManager(configManager.getDatabasePath());
 
       await dbManager.initialize();
       const phases = await dbManager.listPhases();

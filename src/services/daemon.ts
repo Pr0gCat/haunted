@@ -3,6 +3,7 @@
  */
 
 import EventEmitter from 'events';
+import path from 'path';
 import chalk from 'chalk';
 import type { HauntedConfig, Issue } from '../models/index.js';
 import { DatabaseManager } from './database.js';
@@ -30,6 +31,7 @@ export class HauntedDaemon extends EventEmitter {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private stats: DaemonStats;
+  private recentlyProcessedIssues: Map<string, number> = new Map(); // issueId -> timestamp
 
   constructor(config: HauntedConfig) {
     super();
@@ -111,25 +113,48 @@ export class HauntedDaemon extends EventEmitter {
 
   async processNextIssue(): Promise<boolean> {
     try {
+      logger.debug('Starting issue processing cycle');
+
       // Find the next issue to process
+      logger.debug('Fetching open and in-progress issues from database');
       const openIssues = await this.db.listIssues('open');
       const inProgressIssues = await this.db.listIssues('in_progress');
 
+      logger.debug(`Found ${openIssues.length} open issues and ${inProgressIssues.length} in-progress issues`);
+
+      // Filter out issues that are in failed state or completed/closed
+      const validOpenIssues = openIssues.filter(issue =>
+        issue.workflowStage !== 'failed' &&
+        issue.workflowStage !== 'completed' &&
+        issue.status !== 'closed'
+      );
+      const validInProgressIssues = inProgressIssues.filter(issue =>
+        issue.workflowStage !== 'failed' &&
+        issue.workflowStage !== 'completed' &&
+        issue.status !== 'closed'
+      );
+
+      logger.debug(`After filtering: ${validOpenIssues.length} valid open issues and ${validInProgressIssues.length} valid in-progress issues`);
+
       // Prioritize in-progress issues, then open issues
-      const issuesToProcess = [...inProgressIssues, ...openIssues];
+      const issuesToProcess = [...validInProgressIssues, ...validOpenIssues];
 
       if (issuesToProcess.length === 0) {
-        logger.debug('No issues to process');
+        logger.debug('No issues to process - daemon idle');
         return false;
       }
+
+      logger.debug(`Total issues available for processing: ${issuesToProcess.length}`);
 
       // Process the highest priority issue
       const issue = this.selectNextIssue(issuesToProcess);
 
       if (!issue) {
-        logger.debug('No suitable issue found for processing');
+        logger.debug('No suitable issue found for processing after priority filtering');
         return false;
       }
+
+      logger.info(`Selected issue for processing: ${issue.id} (${issue.title}) - Priority: ${issue.priority}, Stage: ${issue.workflowStage}`);
 
       await this.processIssue(issue);
       return true;
@@ -144,25 +169,39 @@ export class HauntedDaemon extends EventEmitter {
 
   private async initialize(): Promise<void> {
     try {
+      logger.info('Starting daemon initialization...');
+
       // Initialize database
-      this.db = new DatabaseManager(this.config.database.url);
+      const dbPath = path.join(process.cwd(), '.haunted', 'database.db');
+      logger.debug(`Initializing database with URL: ${dbPath}`);
+      this.db = new DatabaseManager(dbPath);
       await this.db.initialize();
+      logger.debug('Database manager initialized successfully');
 
       // Initialize git manager
-      this.git = new GitManager(this.config.project.root);
+      const projectRoot = process.cwd();
+      logger.debug(`Initializing git manager for project root: ${projectRoot}`);
+      this.git = new GitManager(projectRoot);
       await this.git.initialize();
+      logger.debug('Git manager initialized successfully');
 
       // Initialize Claude wrapper
-      this.claude = new ClaudeCodeWrapper(this.config.claude.command);
+      logger.debug(`Initializing Claude wrapper with default command`);
+      this.claude = new ClaudeCodeWrapper('claude');
 
       // Check Claude availability
+      logger.debug('Checking Claude Code CLI availability...');
       const isClaudeAvailable = await this.claude.checkAvailability();
       if (!isClaudeAvailable) {
         logger.warn('Claude Code CLI not available - some features may not work');
+      } else {
+        logger.debug('Claude Code CLI is available and ready');
       }
 
       // Initialize workflow engine
+      logger.debug('Initializing workflow engine...');
       this.workflow = new WorkflowEngine(this.db, this.git, this.claude);
+      logger.debug('Workflow engine initialized successfully');
 
       logger.info('Daemon initialized successfully');
 
@@ -173,34 +212,74 @@ export class HauntedDaemon extends EventEmitter {
   }
 
   private startProcessingLoop(): void {
+    logger.info(`Starting processing loop with ${this.config.workflow.checkInterval}ms interval`);
+
     this.intervalId = setInterval(async () => {
       if (!this.isRunning) {
+        logger.debug('Processing loop stopped - daemon not running');
         return;
       }
 
       this.stats.lastCheck = new Date();
+      logger.debug(`Processing loop tick - checking for work (runs: ${this.stats.successfulRuns}/${this.stats.failedRuns})`);
 
       try {
         const hasWork = await this.processNextIssue();
 
         if (hasWork) {
           this.stats.successfulRuns++;
+          logger.debug(`Processing cycle completed successfully (total successful runs: ${this.stats.successfulRuns})`);
           // Note: actual issue-processed event is emitted in processIssue
+        } else {
+          logger.debug('No work available in this processing cycle');
         }
 
       } catch (error) {
         logger.error('Processing loop error:', error);
         this.stats.failedRuns++;
+        logger.debug(`Processing cycle failed (total failed runs: ${this.stats.failedRuns})`);
         this.emit('error', error instanceof Error ? error : new Error(String(error)));
       }
 
     }, this.config.workflow.checkInterval);
+
+    logger.debug(`Processing loop interval set to ${this.config.workflow.checkInterval}ms`);
   }
 
   private selectNextIssue(issues: Issue[]): Issue | null {
     if (issues.length === 0) {
+      logger.debug('No issues provided for selection');
       return null;
     }
+
+    // Clean up old entries (older than 5 minutes)
+    const now = Date.now();
+    const COOLDOWN_PERIOD = 5 * 60 * 1000; // 5 minutes
+    for (const [issueId, timestamp] of this.recentlyProcessedIssues) {
+      if (now - timestamp > COOLDOWN_PERIOD) {
+        this.recentlyProcessedIssues.delete(issueId);
+      }
+    }
+
+    // Filter out recently processed issues
+    const availableIssues = issues.filter(issue => {
+      const lastProcessed = this.recentlyProcessedIssues.get(issue.id);
+      if (lastProcessed) {
+        const timeSinceProcessed = now - lastProcessed;
+        if (timeSinceProcessed < COOLDOWN_PERIOD) {
+          logger.debug(`Skipping issue ${issue.id} - processed ${Math.round(timeSinceProcessed / 1000)}s ago (cooldown: ${COOLDOWN_PERIOD / 1000}s)`);
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (availableIssues.length === 0) {
+      logger.debug('No available issues after filtering recently processed ones');
+      return null;
+    }
+
+    logger.debug(`Selecting next issue from ${availableIssues.length} available candidates (${issues.length} total)`);
 
     // Priority order
     const priorityOrder: Record<string, number> = {
@@ -210,8 +289,13 @@ export class HauntedDaemon extends EventEmitter {
       low: 1
     };
 
+    // Log issue priorities for debugging
+    availableIssues.forEach(issue => {
+      logger.debug(`Issue ${issue.id}: priority=${issue.priority}, stage=${issue.workflowStage}, created=${issue.createdAt.toISOString()}`);
+    });
+
     // Sort by priority (highest first), then by creation date (oldest first)
-    const sortedIssues = issues.sort((a, b) => {
+    const sortedIssues = availableIssues.sort((a, b) => {
       const priorityA = priorityOrder[a.priority] || 0;
       const priorityB = priorityOrder[b.priority] || 0;
 
@@ -223,34 +307,49 @@ export class HauntedDaemon extends EventEmitter {
       return a.createdAt.getTime() - b.createdAt.getTime();
     });
 
-    return sortedIssues[0] || null;
+    const selected = sortedIssues[0] || null;
+    if (selected) {
+      logger.debug(`Selected issue ${selected.id} (${selected.title}) - Priority: ${selected.priority}, Stage: ${selected.workflowStage}`);
+    }
+
+    return selected;
   }
 
   private async processIssue(issue: Issue): Promise<void> {
-    logger.info(`Processing issue ${issue.id}: ${issue.title}`);
+    const startTime = new Date();
+    logger.info(`Processing issue ${issue.id}: ${issue.title} (Stage: ${issue.workflowStage}, Priority: ${issue.priority})`);
+
+    // Mark this issue as recently processed
+    this.recentlyProcessedIssues.set(issue.id, Date.now());
 
     try {
       // Update issue status
       if (issue.status === 'open') {
+        logger.debug(`Updating issue ${issue.id} status from 'open' to 'in_progress'`);
         await this.db.updateIssueStatus(issue.id, 'in_progress');
       }
+
+      logger.debug(`Starting workflow processing for issue ${issue.id} at stage '${issue.workflowStage}'`);
 
       // Process through workflow
       const result = await this.workflow.processIssue(issue);
 
       this.stats.issuesProcessed++;
 
-      logger.info(`Successfully processed issue ${issue.id}`);
-      console.log(chalk.green(`✓ Processed issue: ${issue.title}`));
+      const processingTime = new Date().getTime() - startTime.getTime();
+      logger.info(`Successfully processed issue ${issue.id} in ${processingTime}ms (total processed: ${this.stats.issuesProcessed})`);
+      console.log(chalk.green(`✓ Processed issue: ${issue.title} (${processingTime}ms)`));
 
       this.emit('issue-processed', { issue, result });
 
     } catch (error) {
-      logger.error(`Failed to process issue ${issue.id}:`, error);
-      console.log(chalk.red(`✗ Failed to process issue: ${issue.title}`));
+      const processingTime = new Date().getTime() - startTime.getTime();
+      logger.error(`Failed to process issue ${issue.id} after ${processingTime}ms:`, error);
+      console.log(chalk.red(`✗ Failed to process issue: ${issue.title} (${processingTime}ms)`));
 
       // Update issue status to blocked
       try {
+        logger.debug(`Updating issue ${issue.id} status to 'blocked' after processing failure`);
         await this.db.updateIssueStatus(issue.id, 'blocked');
         await this.db.addComment(
           issue.id,

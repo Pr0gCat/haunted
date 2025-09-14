@@ -3,18 +3,6 @@
  */
 
 export interface HauntedConfig {
-  project: {
-    name: string;
-    root: string;
-  };
-  database: {
-    url: string;
-  };
-  claude: {
-    command: string;
-    maxTokens?: number;
-    temperature?: number;
-  };
   workflow: {
     autoProcess: boolean;
     checkInterval: number;

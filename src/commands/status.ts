@@ -19,7 +19,7 @@ export async function statusCommand(): Promise<void> {
 
     // Load configuration and database
     const config = configManager.loadConfig();
-    const dbManager = new DatabaseManager(config.database.url);
+    const dbManager = new DatabaseManager(configManager.getDatabasePath());
     await dbManager.initialize();
 
     // Get issue statistics
