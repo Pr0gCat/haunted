@@ -36,19 +36,19 @@ export interface Issue {
   plan?: string;
   implementation?: string;
   diagnosisLog?: string;
+  iterationCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export enum WorkflowStage {
-  PENDING = 'pending',
-  ANALYZING = 'analyzing',
-  PLANNING = 'planning',
-  IMPLEMENTING = 'implementing',
-  TESTING = 'testing',
-  REVIEWING = 'reviewing',
-  COMPLETED = 'completed',
-  FAILED = 'failed'
+  PLAN = 'plan',
+  IMPLEMENT = 'implement',
+  UNIT_TEST = 'unit_test',
+  FIX_ISSUES = 'fix_issues',
+  INTEGRATION_TEST = 'integration_test',
+  DIAGNOSE = 'diagnose',
+  DONE = 'done'
 }
 
 export interface Task {

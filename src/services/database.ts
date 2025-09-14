@@ -68,12 +68,13 @@ export class DatabaseManager {
         description TEXT DEFAULT '',
         priority TEXT NOT NULL DEFAULT 'medium',
         status TEXT NOT NULL DEFAULT 'open',
-        workflow_stage TEXT NOT NULL DEFAULT 'pending',
+        workflow_stage TEXT NOT NULL DEFAULT 'plan',
         phase_id TEXT,
         branch_name TEXT NOT NULL,
         plan TEXT,
         implementation TEXT,
         diagnosis_log TEXT,
+        iteration_count INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (phase_id) REFERENCES phases(id)
@@ -180,9 +181,9 @@ export class DatabaseManager {
     const tempBranchName = 'temp';
 
     const result = await this.db.run(`
-      INSERT INTO issues (title, description, priority, phase_id, branch_name)
-      VALUES (?, ?, ?, ?, ?)
-    `, [title, description, priority, phaseId, tempBranchName]);
+      INSERT INTO issues (title, description, priority, phase_id, branch_name, workflow_stage)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [title, description, priority, phaseId, tempBranchName, 'plan']);
 
     // Now update with the proper branch name including the issue number
     const issueId = result.lastID;
@@ -251,6 +252,37 @@ export class DatabaseManager {
     await this.db.run(`
       UPDATE issues SET plan = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
     `, [plan, isNaN(numId) ? id : numId]);
+  }
+
+  async updateIssueImplementation(id: string, implementation: string): Promise<void> {
+    const numId = parseInt(id);
+    await this.db.run(`
+      UPDATE issues SET implementation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `, [implementation, isNaN(numId) ? id : numId]);
+  }
+
+  async updateIssueDiagnosisLog(id: string, diagnosisLog: string): Promise<void> {
+    const numId = parseInt(id);
+    await this.db.run(`
+      UPDATE issues SET diagnosis_log = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `, [diagnosisLog, isNaN(numId) ? id : numId]);
+  }
+
+  async updateIssueIterationCount(id: string, count: number): Promise<void> {
+    const numId = parseInt(id);
+    await this.db.run(`
+      UPDATE issues SET iteration_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `, [count, isNaN(numId) ? id : numId]);
+  }
+
+  async incrementIssueIteration(id: string): Promise<number> {
+    const issue = await this.getIssue(id);
+    if (!issue) {
+      throw new Error(`Issue ${id} not found`);
+    }
+    const newCount = issue.iterationCount + 1;
+    await this.updateIssueIterationCount(id, newCount);
+    return newCount;
   }
 
   // Comment operations
@@ -336,6 +368,7 @@ export class DatabaseManager {
       plan: row.plan,
       implementation: row.implementation,
       diagnosisLog: row.diagnosis_log,
+      iterationCount: row.iteration_count || 0,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     };

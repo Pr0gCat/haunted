@@ -6,6 +6,7 @@ import EventEmitter from 'events';
 import path from 'path';
 import chalk from 'chalk';
 import type { HauntedConfig, Issue } from '../models/index.js';
+import { WorkflowStage } from '../models/index.js';
 import { DatabaseManager } from './database.js';
 import { GitManager } from './git-manager.js';
 import { ClaudeCodeWrapper } from './claude-wrapper.js';
@@ -122,15 +123,13 @@ export class HauntedDaemon extends EventEmitter {
 
       logger.debug(`Found ${openIssues.length} open issues and ${inProgressIssues.length} in-progress issues`);
 
-      // Filter out issues that are in failed state or completed/closed
+      // Filter out issues that are in done state or closed
       const validOpenIssues = openIssues.filter(issue =>
-        issue.workflowStage !== 'failed' &&
-        issue.workflowStage !== 'completed' &&
+        issue.workflowStage !== WorkflowStage.DONE &&
         issue.status !== 'closed'
       );
       const validInProgressIssues = inProgressIssues.filter(issue =>
-        issue.workflowStage !== 'failed' &&
-        issue.workflowStage !== 'completed' &&
+        issue.workflowStage !== WorkflowStage.DONE &&
         issue.status !== 'closed'
       );
 
