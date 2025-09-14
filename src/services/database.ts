@@ -185,9 +185,9 @@ export class DatabaseManager {
       VALUES (?, ?, ?, ?, ?, ?)
     `, [title, description, priority, phaseId, tempBranchName, 'plan']);
 
-    // Now update with the proper branch name including the issue number
+    // Now update with the proper branch name using issue ID format
     const issueId = result.lastID;
-    const branchName = `issue/${issueId}-${title.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 40)}`;
+    const branchName = `#${issueId}`;
 
     await this.db.run(`
       UPDATE issues SET branch_name = ? WHERE id = ?
