@@ -2,28 +2,134 @@
  * Haunted Data Models
  */
 
+// Re-export GitHub models
+export * from './github.js';
+
 export interface HauntedConfig {
-  workflow: {
-    autoProcess: boolean;
-    checkInterval: number;
-    maxRetries: number;
+  // GitHub settings
+  github: {
+    allowedUsers?: string[];  // If empty, uses collaborators
+    triggerLabel: string;
+    projectName: string;
   };
+  // Runner settings
+  runner: {
+    maxConcurrent: number;
+    workDir: string;
+  };
+  // Workflow settings
+  workflow: {
+    maxRetries: number;
+    testCommands?: string[];
+  };
+  // Logging settings
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
     file?: string;
   };
 }
 
-export interface Phase {
-  id: string;
-  name: string;
-  description?: string;
-  status: 'planning' | 'active' | 'completed' | 'archived';
+export const DEFAULT_CONFIG: HauntedConfig = {
+  github: {
+    triggerLabel: 'haunted',
+    projectName: 'Haunted Development',
+  },
+  runner: {
+    maxConcurrent: 3,
+    workDir: '/work',
+  },
+  workflow: {
+    maxRetries: 3,
+  },
+  logging: {
+    level: 'info',
+  },
+};
+
+/**
+ * Tracked Issue - Internal representation of a GitHub issue being processed
+ */
+export interface TrackedIssue {
+  id: string;                    // Internal ID
+  githubNumber: number;          // GitHub issue number
+  repository: string;            // owner/repo
+  title: string;
+  description: string;
+  author: string;
+  status: TrackedIssueStatus;
+  workflowStage: WorkflowStage;
   branchName: string;
+  worktreePath?: string;
+  prNumber?: number;
+  plan?: string;
+  iterationCount: number;
+  errorLog?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
+export type TrackedIssueStatus = 'pending' | 'processing' | 'waiting_approval' | 'blocked' | 'completed';
+
+/**
+ * Workflow Stages - Simplified for GitHub integration
+ */
+export enum WorkflowStage {
+  PLANNING = 'planning',
+  IMPLEMENTING = 'implementing',
+  TESTING = 'testing',
+  REVIEW = 'review',
+  DONE = 'done'
+}
+
+/**
+ * Runner state
+ */
+export interface RunnerState {
+  id: string;
+  status: 'idle' | 'busy' | 'error';
+  currentIssue?: TrackedIssue;
+  startedAt?: Date;
+}
+
+/**
+ * Task Queue Item
+ */
+export interface QueuedTask {
+  id: string;
+  type: 'process_issue' | 'handle_comment' | 'handle_review';
+  repository: string;
+  issueNumber: number;
+  priority: number;
+  payload: Record<string, unknown>;
+  createdAt: Date;
+}
+
+/**
+ * Worktree info
+ */
+export interface WorktreeInfo {
+  path: string;
+  branch: string;
+  issueNumber: number;
+  repository: string;
+  createdAt: Date;
+}
+
+/**
+ * Git Status
+ */
+export interface GitStatus {
+  currentBranch: string;
+  isDirty: boolean;
+  untrackedFiles: string[];
+  modifiedFiles: string[];
+  hasConflicts: boolean;
+}
+
+/**
+ * Legacy exports for backward compatibility during migration
+ * TODO: Remove after full migration
+ */
 export interface Issue {
   id: string;
   title: string;
@@ -39,60 +145,4 @@ export interface Issue {
   iterationCount: number;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export enum WorkflowStage {
-  PLAN = 'plan',
-  IMPLEMENT = 'implement',
-  UNIT_TEST = 'unit_test',
-  FIX_ISSUES = 'fix_issues',
-  INTEGRATION_TEST = 'integration_test',
-  DIAGNOSE = 'diagnose',
-  DONE = 'done'
-}
-
-export interface Task {
-  id: string;
-  issueId: string;
-  description: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  output?: string;
-  error?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Comment {
-  id: string;
-  issueId: string;
-  author: string;
-  content: string;
-  createdAt: Date;
-}
-
-export interface WorkflowRun {
-  id: string;
-  issueId: string;
-  stage: WorkflowStage;
-  status: 'running' | 'completed' | 'failed';
-  startedAt: Date;
-  completedAt?: Date;
-  error?: string;
-  output?: any;
-}
-
-export interface IssueStats {
-  open: number;
-  in_progress: number;
-  blocked: number;
-  closed: number;
-  workflowStages: Record<WorkflowStage, number>;
-}
-
-export interface GitStatus {
-  currentBranch: string;
-  isDirty: boolean;
-  untrackedFiles: string[];
-  modifiedFiles: string[];
-  hasConflicts: boolean;
 }

@@ -1,5 +1,8 @@
 /**
- * MCP Server Implementation for Haunted
+ * @deprecated This module is deprecated and will be removed in v1.0.0
+ * The new architecture uses GitHub Actions Runner instead of MCP Server
+ *
+ * MCP Server Implementation for Haunted (LEGACY)
  * Provides tools for Claude to interact with Haunted functionality
  */
 

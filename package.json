@@ -1,7 +1,7 @@
 {
-  "name": "haunted-cli",
-  "version": "0.2.0",
-  "description": "👻 Spectral Software Solutions - AI-powered development with automated workflow management for Claude Code",
+  "name": "haunted",
+  "version": "0.3.0",
+  "description": "GitHub-integrated autonomous development service powered by Claude Code",
   "author": "ProgCat <progcat@protonmail.com>",
   "license": "MIT",
   "type": "module",
@@ -18,10 +18,10 @@
     "workflow",
     "claude",
     "claude-code",
-    "mcp",
-    "spectral",
-    "haunted",
-    "cli"
+    "github",
+    "github-actions",
+    "issue-driven",
+    "haunted"
   ],
   "bin": {
     "haunted": "./bin/haunted.mjs"
@@ -92,11 +92,13 @@
     "simple-git": "^3.27.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
+    "uuid": "^9.0.0",
     "winston": "^3.17.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
     "eslint": "^9.17.0",

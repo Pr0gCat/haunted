@@ -1,5 +1,8 @@
 /**
- * Haunted Daemon - Background service for processing issues
+ * @deprecated This module is deprecated and will be removed in v1.0.0
+ * Use the new Orchestrator pattern instead: src/orchestrator/index.ts
+ *
+ * Haunted Daemon - Background service for processing issues (LEGACY)
  */
 
 import EventEmitter from 'events';

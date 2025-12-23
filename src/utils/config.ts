@@ -7,14 +7,30 @@ import fsSync from 'fs';
 import path from 'path';
 import { z } from 'zod';
 import type { HauntedConfig } from '../models/index.js';
+import { DEFAULT_CONFIG } from '../models/index.js';
 import { logger } from './logger.js';
 
 const ConfigSchema = z.object({
+  // New GitHub settings
+  github: z.object({
+    allowedUsers: z.array(z.string()).optional(),
+    triggerLabel: z.string(),
+    projectName: z.string(),
+  }).optional(),
+  // New runner settings
+  runner: z.object({
+    maxConcurrent: z.number(),
+    workDir: z.string(),
+  }).optional(),
+  // Workflow settings (updated)
   workflow: z.object({
-    autoProcess: z.boolean(),
-    checkInterval: z.number(),
-    maxRetries: z.number()
+    maxRetries: z.number(),
+    testCommands: z.array(z.string()).optional(),
+    // Legacy fields
+    autoProcess: z.boolean().optional(),
+    checkInterval: z.number().optional(),
   }),
+  // Logging settings
   logging: z.object({
     level: z.enum(['debug', 'info', 'warn', 'error']),
     file: z.string().optional()
@@ -42,18 +58,7 @@ export class ConfigManager {
   }
 
   createDefaultConfig(): HauntedConfig {
-    const config: HauntedConfig = {
-      workflow: {
-        autoProcess: true,
-        checkInterval: 5000, // 30 seconds
-        maxRetries: 3
-      },
-      logging: {
-        level: 'debug'
-      }
-    };
-
-    return config;
+    return { ...DEFAULT_CONFIG };
   }
 
   async saveConfig(config: HauntedConfig): Promise<void> {
@@ -122,6 +127,8 @@ export class ConfigManager {
 
   private mergeConfig(base: HauntedConfig, overrides: Partial<HauntedConfig>): HauntedConfig {
     return {
+      github: { ...base.github, ...overrides.github },
+      runner: { ...base.runner, ...overrides.runner },
       workflow: { ...base.workflow, ...overrides.workflow },
       logging: { ...base.logging, ...overrides.logging }
     };
