@@ -1,0 +1,138 @@
+# Haunted Configuration
+# Copy this file to haunted.yaml and customize
+
+version: "1.0"
+
+# Scope - what repository/organization to haunt
+scope:
+  type: "repo"  # "repo" for single repo, "organization" for all org repos
+  target: "owner/repository"  # or "organization-name"
+
+# GitHub integration settings
+github:
+  webhook:
+    enabled: true
+    port: 3000
+    secret: "${WEBHOOK_SECRET}"  # Optional: webhook secret for verification
+  polling:
+    enabled: true
+    interval: 60  # seconds
+
+# Agent configuration
+agents:
+  house_master:
+    enabled: true
+    auto_assign: true  # Automatically assign issues to AI/humans
+    auto_review: true  # Automatically review PRs created by Claude Code
+
+  claude_code:
+    enabled: true
+    branch_prefix: "haunted/"  # Prefix for branches created by AI
+    auto_test: true  # Run tests before creating PR
+
+# Pull request settings
+pull_requests:
+  auto_merge:
+    enabled: false  # Default: require human approval
+    require_approval: true
+    require_ci_pass: true
+
+  # Rules based on labels
+  rules:
+    - label: "auto-merge"
+      auto_merge: true
+    - label: "needs-review"
+      auto_merge: false
+
+# Project board settings
+project:
+  enabled: true
+  columns:
+    - name: "Backlog"
+      status: "backlog"
+    - name: "In Progress"
+      status: "in_progress"
+    - name: "Review"
+      status: "review"
+    - name: "Done"
+      status: "done"
+
+# Label configuration
+labels:
+  # System control labels
+  human_only: "human-only"  # Issues that should only be handled by humans
+  skip: "haunted-skip"  # Skip AI processing
+  auto_merge: "auto-merge"  # Auto-merge approved PRs
+  needs_review: "needs-review"  # Require human review
+
+  # Auto-apply labels based on AI analysis
+  auto_label: true
+
+  # Issue type labels (customize names, colors, descriptions)
+  issue_types:
+    bug:
+      name: "bug"
+      color: "d73a4a"
+      description: "Something isn't working"
+    feature:
+      name: "feature-request"
+      color: "a2eeef"
+      description: "New feature or request"
+    enhancement:
+      name: "enhancement"
+      color: "84b6eb"
+      description: "Improvement to existing functionality"
+    documentation:
+      name: "documentation"
+      color: "0075ca"
+      description: "Improvements or additions to documentation"
+    question:
+      name: "question"
+      color: "d876e3"
+      description: "Further information is requested"
+    refactor:
+      name: "refactor"
+      color: "fbca04"
+      description: "Code refactoring without functionality changes"
+    test:
+      name: "test"
+      color: "bfd4f2"
+      description: "Testing related changes"
+    chore:
+      name: "chore"
+      color: "fef2c0"
+      description: "Maintenance and housekeeping"
+
+  # Complexity labels
+  complexity:
+    low:
+      name: "complexity:low"
+      color: "c2e0c6"
+      description: "Low complexity task"
+    medium:
+      name: "complexity:medium"
+      color: "fef2c0"
+      description: "Medium complexity task"
+    high:
+      name: "complexity:high"
+      color: "f9d0c4"
+      description: "High complexity task"
+
+  # Priority labels (only high/critical are auto-applied)
+  priority:
+    critical:
+      name: "priority:critical"
+      color: "b60205"
+      description: "Critical priority"
+    high:
+      name: "priority:high"
+      color: "d93f0b"
+      description: "High priority"
+    medium:
+      name: "priority:medium"
+      color: "fbca04"
+      description: "Medium priority"
+    low:
+      name: "priority:low"
+      color: "0e8a16"
+      description: "Low priority"

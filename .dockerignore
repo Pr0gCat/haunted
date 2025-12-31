@@ -1,0 +1,9 @@
+node_modules
+.git
+*.log
+.env
+.env.*
+haunted.yaml
+.DS_Store
+*.md
+!README.md

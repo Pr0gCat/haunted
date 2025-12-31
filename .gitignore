@@ -180,6 +180,10 @@ $RECYCLE.BIN/
 
 # Haunted specific
 .haunted/
+haunted.yaml
+haunted.yml
+.haunted.yaml
+.haunted.yml
 
 # Build output
 dist/
