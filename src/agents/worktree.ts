@@ -78,6 +78,75 @@ export class WorktreeManager {
     return worktree;
   }
 
+  /**
+   * Create a worktree on main branch for direct commits
+   * Used for low-risk changes that don't require PR review
+   */
+  async createWorktreeForMain(
+    repo: string,
+    repoPath: string,
+    issueNumber: number
+  ): Promise<Worktree> {
+    const key = `direct:${repo}:${issueNumber}`;
+    const existing = this.worktrees.get(key);
+
+    if (existing) {
+      logger.debug({ repo, issueNumber }, "Direct-to-main worktree already exists");
+      return existing;
+    }
+
+    const safeName = repo.replace("/", "-");
+    const worktreePath = join(this.baseDir, `${safeName}-direct-${issueNumber}`);
+
+    try {
+      await access(worktreePath);
+      await this.removeWorktreeDir(worktreePath);
+    } catch {
+      // Path doesn't exist, which is fine
+    }
+
+    await this.gitFetch(repoPath);
+
+    // Checkout main branch into the worktree
+    await this.gitCheckoutMainBranch(repoPath, worktreePath);
+
+    const worktree: Worktree = {
+      path: worktreePath,
+      branch: "main",
+      issueNumber,
+      repo,
+      createdAt: new Date(),
+    };
+
+    this.worktrees.set(key, worktree);
+    logger.info({ repo, issueNumber, path: worktreePath }, "Direct-to-main worktree created");
+
+    return worktree;
+  }
+
+  private async gitCheckoutMainBranch(repoPath: string, worktreePath: string): Promise<void> {
+    // Prune any stale worktrees first
+    await this.runGit(repoPath, ["worktree", "prune"]);
+
+    // Create a detached worktree at the latest main commit
+    // This avoids the "branch is already checked out" issue
+    const result = await this.runGit(repoPath, ["worktree", "add", "--detach", worktreePath, "origin/main"]);
+
+    if (result.exitCode !== 0) {
+      throw new Error(`Failed to add main worktree: ${result.stderr}`);
+    }
+
+    // Create and checkout a temporary local branch for the changes
+    const checkoutResult = await this.runGit(worktreePath, ["checkout", "-B", "main", "origin/main"]);
+    if (checkoutResult.exitCode !== 0) {
+      // Try alternative approach
+      const altResult = await this.runGit(worktreePath, ["checkout", "main"]);
+      if (altResult.exitCode !== 0) {
+        logger.warn({ stderr: altResult.stderr }, "Checkout main warning, continuing with detached HEAD");
+      }
+    }
+  }
+
   async createWorktreeForRevision(
     repo: string,
     repoPath: string,
