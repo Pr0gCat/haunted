@@ -18,6 +18,7 @@ export interface IssueAnalysis {
   needsClarification: boolean;
   clarificationQuestion?: string;
   reasoning: string;
+  requiresPR: boolean;
 }
 
 export interface CodeReviewResult {
@@ -81,7 +82,8 @@ Respond with ONLY a JSON object in this exact format:
   "assignTo": "ai" | "human",
   "needsClarification": boolean,
   "clarificationQuestion": "question to ask if needsClarification is true",
-  "reasoning": "brief explanation of your analysis"
+  "reasoning": "brief explanation of your analysis",
+  "requiresPR": boolean
 }
 
 IMPORTANT:
@@ -263,6 +265,19 @@ Guidelines for priority:
 - medium: Important but not urgent, regular features/bugs
 - low: Nice to have, minor improvements
 
+Guidelines for "requiresPR" decision:
+- Set to false (direct commit to main) when ALL of these conditions are met:
+  1. complexity is "low"
+  2. type is one of: "documentation", "chore", "test", "refactor"
+  3. No breaking changes
+  4. No impact on releases
+- Set to true (requires PR review) when ANY of these conditions are met:
+  1. complexity is "medium" or "high"
+  2. type is one of: "feature", "bug", "enhancement"
+  3. Any breaking changes
+  4. Any impact on releases
+  5. Security-sensitive changes
+
 Always respond with ONLY the JSON object, no additional text.`;
   }
 
@@ -305,6 +320,7 @@ Be helpful, concise, and professional.`;
       assignTo: "ai",
       needsClarification: false,
       reasoning: "Default analysis due to processing error",
+      requiresPR: true, // Default to requiring PR for safety
     };
   }
 
