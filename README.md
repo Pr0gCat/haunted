@@ -9,6 +9,22 @@ Transform your development workflow with an autonomous AI spirit that thinks, co
 [![npm version](https://badge.fury.io/js/haunted-cli.svg)](https://badge.fury.io/js/haunted-cli)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-43853D?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## 📖 Table of Contents
+
+- [Supernatural Features](#-supernatural-features)
+- [Summoning Requirements](#️-summoning-requirements)
+- [Installation](#-possession-ritual)
+- [Quick Start](#-summoning-your-spectral-developer)
+- [Workflow](#workflow)
+- [Commands](#commands)
+- [MCP Server](#-mcp-server)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [Contributing](#contributing)
 
 ## 🔮 Supernatural Features
 
@@ -180,23 +196,38 @@ Configuration is stored in `.haunted/config.json`:
 ## Architecture
 
 ```
-src/
-├── cli/           # Command-line interface entry point
-├── commands/      # Individual command implementations
-│   ├── init.ts           # Project initialization
-│   ├── issue.ts          # Issue management commands
-│   ├── phase.ts          # Phase management commands
-│   ├── start.ts          # Daemon start command
-│   └── status.ts         # Status display command
-├── services/      # Core business logic
-│   ├── claude-wrapper.ts # Claude Code CLI integration
-│   ├── workflow-engine.ts # Workflow engine
-│   ├── database.ts       # SQLite database management
-│   ├── git-manager.ts    # Git operations
-│   └── daemon.ts         # Background service
-├── models/        # TypeScript data models
-├── mcp/           # MCP server for Claude integration
-└── utils/         # Utilities, config, and logging
+haunted-cli/
+├── bin/                   # Executable scripts
+│   ├── haunted.mjs              # Main CLI entry point
+│   └── haunted-mcp.mjs          # MCP server entry point
+├── src/
+│   ├── cli/               # Command-line interface
+│   │   └── index.ts             # CLI setup and command routing
+│   ├── commands/          # Individual command implementations
+│   │   ├── init.ts              # Project initialization
+│   │   ├── issue.ts             # Issue management commands
+│   │   ├── phase.ts             # Phase management commands
+│   │   ├── start.ts             # Daemon start command
+│   │   └── status.ts            # Status display command
+│   ├── services/          # Core business logic
+│   │   ├── claude-wrapper.ts    # Claude Code CLI integration
+│   │   ├── workflow-engine.ts   # Workflow state machine
+│   │   ├── database.ts          # SQLite database management
+│   │   ├── git-manager.ts       # Git operations (simple-git)
+│   │   └── daemon.ts            # Background service
+│   ├── models/            # TypeScript data models
+│   │   └── index.ts             # Issue, Phase, Comment types
+│   ├── mcp/               # MCP server for Claude integration
+│   │   └── index.ts             # MCP server implementation
+│   └── utils/             # Utilities
+│       ├── config.ts            # Configuration management
+│       ├── logger.ts            # Winston logger setup
+│       └── greeting.ts          # Greeting utilities
+├── docs/                  # Documentation
+│   └── DEVELOPMENT_WORKFLOW.md  # Development workflow guide
+└── .haunted/              # Project data (created after init)
+    ├── config.json              # Project configuration
+    └── database.db              # SQLite database
 ```
 
 ## Development Workflow Integration
@@ -216,14 +247,58 @@ Haunted is designed to work with your existing development workflow:
 - **issue/<id>**: Individual Issue branches
 - Auto-merge: Issues -> Phases -> Main (when ready)
 
-## MCP Tools
+## 🔌 MCP Server
 
-Claude has access to comprehensive tools:
-- File operations (read, write, list)
-- Command execution
-- Git operations
-- Issue management
-- Code search and analysis
+Haunted includes an MCP (Model Context Protocol) server that enables direct integration with Claude Desktop and other MCP-compatible clients.
+
+### Setting Up MCP Server
+
+Add the following configuration to your Claude Desktop settings:
+
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "haunted": {
+      "command": "npx",
+      "args": ["haunted-cli", "mcp"]
+    }
+  }
+}
+```
+
+Or if installed globally:
+
+```json
+{
+  "mcpServers": {
+    "haunted": {
+      "command": "haunted-mcp"
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+Once configured, Claude has access to comprehensive tools:
+
+| Tool | Description |
+|------|-------------|
+| `create_issue` | Create a new issue with title, description, and priority |
+| `list_issues` | List issues with optional status/stage filtering |
+| `get_issue` | Get detailed information about a specific issue |
+| `update_issue_status` | Update issue status (open, in_progress, blocked, closed) |
+| `add_comment` | Add a comment to an issue |
+| `create_phase` | Create a new project phase |
+| `list_phases` | List all project phases |
+| `git_status` | Get current Git repository status |
+| `git_create_branch` | Create a new Git branch |
+| `process_issue` | Process an issue through the workflow engine |
+| `analyze_issue` | Analyze an issue and create implementation plan |
+| `project_stats` | Get project statistics and overview |
 
 ## Troubleshooting
 
@@ -299,18 +374,41 @@ npm install
 # Build the project
 npm run build
 
-# Run in development mode
+# Run in development mode (with hot reload)
 npm run dev
 
 # Run tests
 npm test
+
+# Run tests with watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
 
 # Type checking
 npm run typecheck
 
 # Linting
 npm run lint
+
+# Fix linting issues
+npm run lint:fix
+
+# Format code
+npm run format
 ```
+
+### Tech Stack
+
+- **Runtime**: Node.js 20+
+- **Language**: TypeScript 5.7+
+- **Build Tool**: tsup
+- **Testing**: Vitest
+- **Database**: SQLite (via better-sqlite3)
+- **Git Operations**: simple-git
+- **CLI Framework**: Commander.js
+- **MCP SDK**: @modelcontextprotocol/sdk
 
 ## Contributing
 
@@ -322,4 +420,11 @@ npm run lint
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  <strong>👻 Happy Haunting! 👻</strong><br>
+  <sub>Made with supernatural powers by <a href="https://github.com/progcat">ProgCat</a></sub>
+</p>
