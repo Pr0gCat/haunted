@@ -47,6 +47,9 @@ pull_requests:
 # Project board settings
 project:
   enabled: true
+  number: 8  # GitHub Project number (from URL: /projects/8)
+  owner: "owner"  # GitHub username or organization name
+  auto_add_issues: true  # Automatically add new issues to the project
   columns:
     - name: "Backlog"
       status: "backlog"

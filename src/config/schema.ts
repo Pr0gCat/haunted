@@ -161,10 +161,16 @@ const DEFAULT_COLUMNS = [
 export const ProjectConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
+    number: z.number().optional().describe("GitHub Project number"),
+    owner: z.string().optional().describe("GitHub Project owner (user or organization)"),
+    auto_add_issues: z.boolean().optional().describe("Automatically add new issues to the project"),
     columns: z.array(ProjectColumnSchema).optional(),
   })
   .transform((val) => ({
     enabled: val.enabled ?? true,
+    number: val.number,
+    owner: val.owner,
+    auto_add_issues: val.auto_add_issues ?? true,
     columns: val.columns ?? DEFAULT_COLUMNS,
   }));
 
@@ -285,6 +291,9 @@ export const ConfigSchema = z
     project: z
       .object({
         enabled: z.boolean().optional(),
+        number: z.number().optional(),
+        owner: z.string().optional(),
+        auto_add_issues: z.boolean().optional(),
         columns: z.array(ProjectColumnSchema).optional(),
       })
       .optional(),
@@ -337,6 +346,9 @@ export const ConfigSchema = z
     },
     project: {
       enabled: val.project?.enabled ?? true,
+      number: val.project?.number,
+      owner: val.project?.owner,
+      auto_add_issues: val.project?.auto_add_issues ?? true,
       columns: val.project?.columns ?? DEFAULT_COLUMNS,
     },
     labels: {
