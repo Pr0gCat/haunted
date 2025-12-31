@@ -154,6 +154,7 @@ export class Poller {
           repository: {
             full_name: repo,
             default_branch: "main",
+            owner: { login: repo.split("/")[0] },
           },
           sender: { login: "poller" },
         },
@@ -239,6 +240,7 @@ export class Poller {
           repository: {
             full_name: repo,
             default_branch: "main",
+            owner: { login: repo.split("/")[0] },
           },
           sender: { login: "poller" },
         },
@@ -298,7 +300,7 @@ export class Poller {
           action: evt.payload.action,
           payload: {
             ...evt.payload,
-            repository: { full_name: repo },
+            repository: { full_name: repo, owner: { login: repo.split("/")[0] } },
           },
           deliveryId: `poll:${eventId}`,
           receivedAt: new Date(),
