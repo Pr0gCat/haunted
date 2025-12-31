@@ -1,18 +1,15 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
+import { createHmac } from "node:crypto";
 import { createLogger } from "@/utils/logger.ts";
 import type { Config } from "@/config/schema.ts";
 import type { GitHubEvent, EventHandler } from "@/events/types.ts";
 
 const logger = createLogger("webhook-server");
 
-function verifySignature(payload: string, signature: string, secret: string): boolean {
-  const encoder = new TextEncoder();
-  const key = encoder.encode(secret);
-  const data = encoder.encode(payload);
-
-  const hmac = new Bun.CryptoHasher("sha256", key);
-  hmac.update(data);
+export function verifySignature(payload: string, signature: string, secret: string): boolean {
+  const hmac = createHmac("sha256", secret);
+  hmac.update(payload);
   const expectedSignature = `sha256=${hmac.digest("hex")}`;
 
   // Use constant-time comparison to prevent timing attacks
@@ -20,12 +17,9 @@ function verifySignature(payload: string, signature: string, secret: string): bo
     return false;
   }
 
-  const sigBytes = encoder.encode(signature);
-  const expectedBytes = encoder.encode(expectedSignature);
-
   let result = 0;
-  for (let i = 0; i < sigBytes.length; i++) {
-    result |= sigBytes[i]! ^ expectedBytes[i]!;
+  for (let i = 0; i < signature.length; i++) {
+    result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
   }
 
   return result === 0;
