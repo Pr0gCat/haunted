@@ -30,6 +30,7 @@ const DEFAULT_BASE_DELAY_MS = 1000;
  * - Timeout errors
  */
 export function isRetryableError(stderr: string): boolean {
+  // 檢查錯誤訊息是否為可重試的錯誤類型（如 5xx 伺服器錯誤、網路連線錯誤、逾時等）
   const lowerStderr = stderr.toLowerCase();
 
   // Check for 5xx HTTP errors
