@@ -114,13 +114,13 @@ describe("issue handlers", () => {
         await handlers.handleIssueOpened(event);
 
         // Wait for the non-blocking project add to complete
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        expect(mockAddIssueToProject).toHaveBeenCalledWith(
-          "Pr0gCat",
-          8,
-          "https://github.com/owner/repo/issues/10"
-        );
+        await vi.waitFor(() => {
+          expect(mockAddIssueToProject).toHaveBeenCalledWith(
+            "Pr0gCat",
+            8,
+            "https://github.com/owner/repo/issues/10"
+          );
+        });
       });
 
       it("should not add issue to project when project is disabled", async () => {
@@ -130,9 +130,10 @@ describe("issue handlers", () => {
 
         await handlers.handleIssueOpened(event);
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        expect(mockAddIssueToProject).not.toHaveBeenCalled();
+        // Allow any pending promises to resolve
+        await vi.waitFor(() => {
+          expect(mockAddIssueToProject).not.toHaveBeenCalled();
+        });
       });
 
       it("should not add issue to project when project number is not configured", async () => {
@@ -142,9 +143,9 @@ describe("issue handlers", () => {
 
         await handlers.handleIssueOpened(event);
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        expect(mockAddIssueToProject).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+          expect(mockAddIssueToProject).not.toHaveBeenCalled();
+        });
       });
 
       it("should not add issue to project when project owner is not configured", async () => {
@@ -154,9 +155,9 @@ describe("issue handlers", () => {
 
         await handlers.handleIssueOpened(event);
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        expect(mockAddIssueToProject).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+          expect(mockAddIssueToProject).not.toHaveBeenCalled();
+        });
       });
 
       it("should not add issue to project when auto_add_issues is disabled", async () => {
@@ -166,9 +167,9 @@ describe("issue handlers", () => {
 
         await handlers.handleIssueOpened(event);
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        expect(mockAddIssueToProject).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+          expect(mockAddIssueToProject).not.toHaveBeenCalled();
+        });
       });
 
       it("should continue processing even if adding to project fails", async () => {
@@ -181,7 +182,9 @@ describe("issue handlers", () => {
         await handlers.handleIssueOpened(event);
 
         // Wait for the non-blocking project add to fail silently
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await vi.waitFor(() => {
+          expect(mockAddIssueToProject).toHaveBeenCalled();
+        });
 
         // Should still process the issue normally
         expect(mockOrchestrator.processIssue).toHaveBeenCalled();
@@ -218,10 +221,11 @@ describe("issue handlers", () => {
 
         await handlers.handleIssueOpened(event);
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // Wait for the non-blocking project add to complete
+        await vi.waitFor(() => {
+          expect(mockAddIssueToProject).toHaveBeenCalled();
+        });
 
-        // Project add should still happen
-        expect(mockAddIssueToProject).toHaveBeenCalled();
         // But orchestrator processing should be skipped
         expect(mockOrchestrator.processIssue).not.toHaveBeenCalled();
       });

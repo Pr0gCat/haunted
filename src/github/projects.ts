@@ -26,8 +26,10 @@ export async function listProjects(owner: string): Promise<Project[]> {
     "api",
     "graphql",
     "-f",
-    `query=query {
-      user(login: "${owner}") {
+    `owner=${owner}`,
+    "-f",
+    `query=query($owner: String!) {
+      user(login: $owner) {
         projectsV2(first: 20) {
           nodes {
             id
@@ -45,8 +47,10 @@ export async function listProjects(owner: string): Promise<Project[]> {
       "api",
       "graphql",
       "-f",
-      `query=query {
-        organization(login: "${owner}") {
+      `owner=${owner}`,
+      "-f",
+      `query=query($owner: String!) {
+        organization(login: $owner) {
           projectsV2(first: 20) {
             nodes {
               id
