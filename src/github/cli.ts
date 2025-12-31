@@ -18,19 +18,26 @@ export interface GhOptions {
   baseDelayMs?: number;
 }
 
-/** Default retry configuration */
-const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_BASE_DELAY_MS = 1000;
+/** Default retry configuration (can be overridden via environment variables) */
+const DEFAULT_MAX_RETRIES = parseInt(process.env.GH_MAX_RETRIES || "3", 10);
+const DEFAULT_BASE_DELAY_MS = parseInt(process.env.GH_BASE_DELAY_MS || "1000", 10);
 
 /**
  * Determines if an error is retryable based on stderr content.
  * Retryable errors include:
  * - 5xx server errors
+ * - HTTP 429 (Rate Limit) errors
  * - Network/connection errors
  * - Timeout errors
  */
 export function isRetryableError(stderr: string): boolean {
   const lowerStderr = stderr.toLowerCase();
+
+  // Check for HTTP 429 Rate Limit errors
+  const rateLimitPattern = /\b429\b|rate limit|too many requests/i;
+  if (rateLimitPattern.test(stderr)) {
+    return true;
+  }
 
   // Check for 5xx HTTP errors
   const http5xxPattern = /\b5\d{2}\b|internal server error|bad gateway|service unavailable|gateway timeout/i;
@@ -69,11 +76,17 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Calculate exponential backoff delay.
- * delay = baseDelay * 2^attempt (e.g., 1s, 2s, 4s for attempts 0, 1, 2)
+ * Calculate exponential backoff delay with jitter.
+ * Base delay = baseDelay * 2^attempt (e.g., 1s, 2s, 4s for attempts 0, 1, 2)
+ * Jitter is applied as: delay * (0.5 + Math.random()) to avoid thundering herd
  */
-export function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
-  return baseDelayMs * Math.pow(2, attempt);
+export function calculateBackoffDelay(attempt: number, baseDelayMs: number, withJitter: boolean = true): number {
+  const baseDelay = baseDelayMs * Math.pow(2, attempt);
+  if (withJitter) {
+    // Apply jitter: multiply by random factor between 0.5 and 1.5
+    return Math.floor(baseDelay * (0.5 + Math.random()));
+  }
+  return baseDelay;
 }
 
 /**
@@ -171,13 +184,18 @@ export async function gh(args: string[], options: GhOptions = {}): Promise<GhRes
     }
   }
 
-  // This should not be reached, but just in case
+  // This should not be reached, but defensive check just in case
   if (lastError) {
     throw lastError;
   }
 
-  // Return last result if we have one
-  return lastResult!;
+  // Return last result if we have one, otherwise throw an error
+  if (lastResult) {
+    return lastResult;
+  }
+
+  // This should never happen, but provide a clear error if it does
+  throw new Error(`gh command failed after ${maxRetries} retries: unexpected state with no result or error`);
 }
 
 export async function ghJson<T>(args: string[], options: GhOptions = {}): Promise<T> {

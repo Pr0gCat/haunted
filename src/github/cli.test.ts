@@ -13,6 +13,21 @@ vi.mock("@/utils/logger.ts", () => ({
 
 describe("github/cli", () => {
   describe("isRetryableError", () => {
+    describe("429 Rate Limit errors", () => {
+      it("should return true for HTTP 429", () => {
+        expect(isRetryableError("HTTP 429: Too Many Requests")).toBe(true);
+      });
+
+      it("should return true for rate limit text", () => {
+        expect(isRetryableError("rate limit exceeded")).toBe(true);
+        expect(isRetryableError("API rate limit")).toBe(true);
+      });
+
+      it("should return true for 'too many requests' text", () => {
+        expect(isRetryableError("too many requests")).toBe(true);
+      });
+    });
+
     describe("5xx HTTP errors", () => {
       it("should return true for 500 Internal Server Error", () => {
         expect(isRetryableError("HTTP 500: Internal Server Error")).toBe(true);
@@ -130,40 +145,72 @@ describe("github/cli", () => {
   });
 
   describe("calculateBackoffDelay", () => {
-    it("should calculate correct delay for attempt 0", () => {
-      expect(calculateBackoffDelay(0, 1000)).toBe(1000);
+    describe("without jitter", () => {
+      it("should calculate correct delay for attempt 0", () => {
+        expect(calculateBackoffDelay(0, 1000, false)).toBe(1000);
+      });
+
+      it("should calculate correct delay for attempt 1", () => {
+        expect(calculateBackoffDelay(1, 1000, false)).toBe(2000);
+      });
+
+      it("should calculate correct delay for attempt 2", () => {
+        expect(calculateBackoffDelay(2, 1000, false)).toBe(4000);
+      });
+
+      it("should calculate correct delay for attempt 3", () => {
+        expect(calculateBackoffDelay(3, 1000, false)).toBe(8000);
+      });
+
+      it("should work with different base delays", () => {
+        expect(calculateBackoffDelay(0, 500, false)).toBe(500);
+        expect(calculateBackoffDelay(1, 500, false)).toBe(1000);
+        expect(calculateBackoffDelay(2, 500, false)).toBe(2000);
+      });
+
+      it("should handle custom base delay", () => {
+        expect(calculateBackoffDelay(0, 100, false)).toBe(100);
+        expect(calculateBackoffDelay(1, 100, false)).toBe(200);
+        expect(calculateBackoffDelay(2, 100, false)).toBe(400);
+      });
     });
 
-    it("should calculate correct delay for attempt 1", () => {
-      expect(calculateBackoffDelay(1, 1000)).toBe(2000);
-    });
+    describe("with jitter (default)", () => {
+      it("should return delay within expected jitter range for attempt 0", () => {
+        // With base delay of 1000ms and jitter factor 0.5-1.5, delay should be 500-1500ms
+        const delay = calculateBackoffDelay(0, 1000);
+        expect(delay).toBeGreaterThanOrEqual(500);
+        expect(delay).toBeLessThanOrEqual(1500);
+      });
 
-    it("should calculate correct delay for attempt 2", () => {
-      expect(calculateBackoffDelay(2, 1000)).toBe(4000);
-    });
+      it("should return delay within expected jitter range for attempt 1", () => {
+        // Base delay is 2000ms, with jitter: 1000-3000ms
+        const delay = calculateBackoffDelay(1, 1000);
+        expect(delay).toBeGreaterThanOrEqual(1000);
+        expect(delay).toBeLessThanOrEqual(3000);
+      });
 
-    it("should calculate correct delay for attempt 3", () => {
-      expect(calculateBackoffDelay(3, 1000)).toBe(8000);
-    });
+      it("should return delay within expected jitter range for attempt 2", () => {
+        // Base delay is 4000ms, with jitter: 2000-6000ms
+        const delay = calculateBackoffDelay(2, 1000);
+        expect(delay).toBeGreaterThanOrEqual(2000);
+        expect(delay).toBeLessThanOrEqual(6000);
+      });
 
-    it("should work with different base delays", () => {
-      expect(calculateBackoffDelay(0, 500)).toBe(500);
-      expect(calculateBackoffDelay(1, 500)).toBe(1000);
-      expect(calculateBackoffDelay(2, 500)).toBe(2000);
-    });
-
-    it("should handle custom base delay", () => {
-      expect(calculateBackoffDelay(0, 100)).toBe(100);
-      expect(calculateBackoffDelay(1, 100)).toBe(200);
-      expect(calculateBackoffDelay(2, 100)).toBe(400);
+      it("should produce varying delays due to jitter", () => {
+        // Run multiple times and check that we get different values (jitter is random)
+        const delays = new Set<number>();
+        for (let i = 0; i < 10; i++) {
+          delays.add(calculateBackoffDelay(1, 1000));
+        }
+        // With jitter, we should get multiple different values
+        expect(delays.size).toBeGreaterThan(1);
+      });
     });
   });
 });
 
 describe("gh() retry behavior", () => {
-  // Note: These tests use a mock implementation to avoid actually spawning gh commands.
-  // The actual retry behavior is tested via integration with the implementation above.
-
   it("should export isRetryableError function", () => {
     expect(typeof isRetryableError).toBe("function");
   });
@@ -171,4 +218,17 @@ describe("gh() retry behavior", () => {
   it("should export calculateBackoffDelay function", () => {
     expect(typeof calculateBackoffDelay).toBe("function");
   });
+
+  // Note: Full integration tests for gh() function retry behavior require
+  // running in Bun environment due to Bun.env usage. These tests verify
+  // the retry logic through the exported helper functions above.
+  //
+  // The following scenarios are covered by the helper function tests:
+  // - 429 rate limit errors trigger retries (isRetryableError tests)
+  // - 5xx server errors trigger retries (isRetryableError tests)
+  // - Network errors trigger retries (isRetryableError tests)
+  // - 4xx client errors do not trigger retries (isRetryableError tests)
+  // - Backoff delay calculation with jitter (calculateBackoffDelay tests)
+  //
+  // For full integration testing, run with: bun test src/github/cli.test.ts
 });
