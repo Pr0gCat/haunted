@@ -2,6 +2,7 @@ import { createLogger } from "@/utils/logger.ts";
 import type { GitHubEvent, IssueEventPayload } from "@/events/types.ts";
 import type { Config } from "@/config/schema.ts";
 import type { Orchestrator } from "@/agents/orchestrator.ts";
+import { addIssueToProject } from "@/github/projects.ts";
 
 const logger = createLogger("issue-handler");
 
@@ -10,8 +11,22 @@ export function createIssueHandlers(config: Config, orchestrator: Orchestrator) 
     const payload = event.payload as unknown as IssueEventPayload;
     const { issue, repository } = payload;
     const repo = repository.full_name;
+    const owner = repository.owner.login;
 
     logger.info({ repo, number: issue.number, title: issue.title }, "New issue opened");
+
+    // Add issue to project board if configured
+    if (config.project.enabled && config.project.number) {
+      try {
+        await addIssueToProject(owner, config.project.number, issue.html_url);
+        logger.info(
+          { repo, number: issue.number, projectNumber: config.project.number },
+          "Issue added to project board"
+        );
+      } catch (error) {
+        logger.error({ error, number: issue.number }, "Failed to add issue to project");
+      }
+    }
 
     const labels = issue.labels.map((l) => l.name);
 

@@ -78,6 +78,7 @@ describe("Orchestrator", () => {
     },
     project: {
       enabled: true,
+      number: undefined,
       columns: [
         { name: "Backlog", status: "backlog" },
         { name: "In Progress", status: "in_progress" },

@@ -63,7 +63,6 @@ export function isRetryableError(stderr: string): boolean {
 
 /**
  * Sleep for a specified duration.
- * @param ms - Duration to sleep in milliseconds
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -23,6 +23,7 @@ export interface IssueEventPayload {
   repository: {
     full_name: string;
     default_branch: string;
+    owner: { login: string };
   };
   sender: { login: string };
 }

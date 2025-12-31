@@ -161,10 +161,12 @@ const DEFAULT_COLUMNS = [
 export const ProjectConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
+    number: z.number().optional().describe("GitHub Project number to use"),
     columns: z.array(ProjectColumnSchema).optional(),
   })
   .transform((val) => ({
     enabled: val.enabled ?? true,
+    number: val.number,
     columns: val.columns ?? DEFAULT_COLUMNS,
   }));
 
@@ -285,6 +287,7 @@ export const ConfigSchema = z
     project: z
       .object({
         enabled: z.boolean().optional(),
+        number: z.number().optional(),
         columns: z.array(ProjectColumnSchema).optional(),
       })
       .optional(),
@@ -337,6 +340,7 @@ export const ConfigSchema = z
     },
     project: {
       enabled: val.project?.enabled ?? true,
+      number: val.project?.number,
       columns: val.project?.columns ?? DEFAULT_COLUMNS,
     },
     labels: {
