@@ -510,7 +510,22 @@ Important:
 - Follow the project's coding style
 - If you encounter blockers, document them clearly
 
-After completing your work, provide a brief summary of the changes you made.`;
+After completing your work, provide a detailed summary in the following format:
+
+## Summary
+[2-3 sentences describing what this change does and why]
+
+## Changes
+[List each modified file with a brief description of the changes made]
+- **filename.ts**: description of changes
+- **another-file.ts**: description of changes
+
+## Test Results
+[Include test results if tests were run]
+- ✅ or ❌ Tests status
+- ✅ or ❌ TypeScript type check status (if applicable)
+
+This format is required for generating a clear PR description.`;
   }
 
   private getTaskPrompt(issue: Issue): string {
