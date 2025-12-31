@@ -83,11 +83,5 @@ export async function getGhUser(): Promise<string | null> {
   return result.stdout;
 }
 
-/**
- * Sleep for a specified duration.
- * @param ms - Duration in milliseconds
- * @returns Promise that resolves after the specified duration
- */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Re-export sleep from utils for backwards compatibility
+export { sleep } from "@/utils/async.ts";
