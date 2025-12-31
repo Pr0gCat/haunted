@@ -15,7 +15,20 @@ function verifySignature(payload: string, signature: string, secret: string): bo
   hmac.update(data);
   const expectedSignature = `sha256=${hmac.digest("hex")}`;
 
-  return signature === expectedSignature;
+  // Use constant-time comparison to prevent timing attacks
+  if (signature.length !== expectedSignature.length) {
+    return false;
+  }
+
+  const sigBytes = encoder.encode(signature);
+  const expectedBytes = encoder.encode(expectedSignature);
+
+  let result = 0;
+  for (let i = 0; i < sigBytes.length; i++) {
+    result |= sigBytes[i]! ^ expectedBytes[i]!;
+  }
+
+  return result === 0;
 }
 
 export function createWebhookServer(config: Config, handler: EventHandler) {
@@ -37,7 +50,11 @@ export function createWebhookServer(config: Config, handler: EventHandler) {
 
     const rawBody = await c.req.text();
 
-    if (config.github.webhook.secret && signature) {
+    if (config.github.webhook.secret) {
+      if (!signature) {
+        logger.warn({ deliveryId }, "Missing webhook signature");
+        return c.json({ error: "Missing signature" }, 401);
+      }
       if (!verifySignature(rawBody, signature, config.github.webhook.secret)) {
         logger.warn({ deliveryId }, "Invalid webhook signature");
         return c.json({ error: "Invalid signature" }, 401);
