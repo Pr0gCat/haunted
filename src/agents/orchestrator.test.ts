@@ -3,7 +3,6 @@ import { Orchestrator } from "./orchestrator.ts";
 import type { Config } from "@/config/schema.ts";
 import * as issues from "@/github/issues.ts";
 import * as pullRequests from "@/github/pull-requests.ts";
-import * as comments from "@/github/comments.ts";
 
 // Mock all dependencies
 vi.mock("@/github/issues.ts", () => ({

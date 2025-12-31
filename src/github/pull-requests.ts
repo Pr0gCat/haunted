@@ -162,7 +162,7 @@ export async function createPullRequest(params: CreatePRParams): Promise<PullReq
     throw new Error(`Failed to create PR: ${result.stderr}`);
   }
 
-  const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^\/]+\/[^\/]+\/pull\/(\d+)/);
+  const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/(\d+)/);
   if (!urlMatch) {
     throw new Error("Failed to parse PR URL from output");
   }

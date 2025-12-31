@@ -1,4 +1,4 @@
-import { gh, ghJson } from "@/github/cli.ts";
+import { gh } from "@/github/cli.ts";
 import { createLogger } from "@/utils/logger.ts";
 
 const logger = createLogger("github-issues");
@@ -157,7 +157,7 @@ export async function createIssue(params: CreateIssueParams): Promise<Issue> {
     throw new Error(`Failed to create issue: ${result.stderr}`);
   }
 
-  const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/(\d+)/);
+  const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/(\d+)/);
   if (!urlMatch) {
     throw new Error("Failed to parse issue URL from output");
   }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WorktreeManager } from "./worktree.ts";
 import { spawn } from "node:child_process";
 import { mkdir, rm, access } from "node:fs/promises";
@@ -37,8 +37,8 @@ describe("WorktreeManager", () => {
     const stdoutEmitter = new EventEmitter();
     const stderrEmitter = new EventEmitter();
 
-    (proc as any).stdout = stdoutEmitter;
-    (proc as any).stderr = stderrEmitter;
+    Object.defineProperty(proc, "stdout", { value: stdoutEmitter });
+    Object.defineProperty(proc, "stderr", { value: stderrEmitter });
 
     // Emit data and close in next tick
     setTimeout(() => {

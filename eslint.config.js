@@ -11,6 +11,20 @@ export default [
       parserOptions: {
         project: "./tsconfig.json",
       },
+      globals: {
+        // Node.js globals
+        process: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        console: "readonly",
+        // Bun globals
+        Bun: "readonly",
+        // Web globals
+        crypto: "readonly",
+      },
     },
     plugins: {
       "@typescript-eslint": tseslint,

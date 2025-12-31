@@ -34,7 +34,7 @@ export class EventRouter {
   }
 
   async handle(event: GitHubEvent): Promise<void> {
-    const { type, action, payload } = event;
+    const { type, action } = event;
 
     if (this.shouldSkipEvent(event)) {
       logger.debug({ type, action }, "Event skipped");
