@@ -249,15 +249,19 @@ Guidelines for "assignTo" decision:
 - Assign to "human" for: complex architectural decisions, security-sensitive changes, issues requiring domain expertise
 
 Guidelines for "needsClarification":
-- Set to true when the issue description is too vague to implement
-- Set to true when critical details are missing (e.g., "update X" without specifying what to update)
-- Provide a specific question asking for the missing information
-- IMPORTANT: Check the comments section for additional context from users before deciding
-- If users have provided clarification in comments, use that information and set needsClarification to false
-- Examples of vague issues that need clarification:
-  - "Fix the bug" (which bug? what's the expected behavior?)
-  - "Update README" (what specifically should be updated?)
-  - "Improve performance" (which part? what's the target?)
+- IMPORTANT: Default to false. Only set to true when absolutely necessary.
+- Set to true ONLY when the issue is so vague that you cannot make ANY reasonable attempt
+- If you can make a reasonable interpretation, set to false and proceed
+- If the issue provides specific file names, function names, or clear instructions, set to false
+- Check the comments section for additional context before deciding
+- Examples where needsClarification should be FALSE:
+  - "Add JSDoc to function X" - clear task, proceed
+  - "Fix typo in file.ts" - can search and fix, proceed
+  - "Update copyright year" - clear task, proceed
+- Examples where needsClarification should be TRUE:
+  - "Fix the bug" (no details about which bug)
+  - "Make it better" (no specific improvement mentioned)
+  - "Update the config" (no details about what to change)
 
 Guidelines for priority:
 - critical: Production down, security vulnerabilities, data loss
