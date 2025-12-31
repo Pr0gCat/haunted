@@ -151,9 +151,10 @@ export class Orchestrator {
         }
 
         const prBody = this.formatPRDescription(result.summary, result.filesChanged, issue.number);
+        const commitPrefix = this.getCommitPrefix(issue.labels);
         const pr = await createPullRequest({
           repo: task.repo,
-          title: `fix: ${issue.title}`,
+          title: `${commitPrefix}: ${issue.title}`,
           body: prBody,
           head: result.branchName,
           base: "main",
@@ -387,9 +388,9 @@ export class Orchestrator {
    */
   private formatPRDescription(summary: string, filesChanged: string[], issueNumber: number): string {
     // Parse the summary to extract sections if they exist
-    const summarySection = this.extractSection(summary, "## Summary", "##") || summary;
-    const changesSection = this.extractSection(summary, "## Changes", "##");
-    const testSection = this.extractSection(summary, "## Test Results", "##");
+    const summarySection = this.extractSection(summary, "## Summary") || summary;
+    const changesSection = this.extractSection(summary, "## Changes");
+    const testSection = this.extractSection(summary, "## Test Results");
 
     let body = `## Summary\n\n${summarySection.trim()}\n\n`;
 
@@ -415,18 +416,72 @@ export class Orchestrator {
   /**
    * Extract a section from markdown text.
    * Returns content between the section header and the next header or end of text.
+   * Uses regex to match headers at the start of a line to avoid false matches.
    */
-  private extractSection(text: string, sectionHeader: string, nextHeaderPrefix: string): string | null {
-    const headerIndex = text.indexOf(sectionHeader);
-    if (headerIndex === -1) return null;
+  private extractSection(text: string, sectionHeader: string, headerLevel: number = 2): string | null {
+    // Match the section header at the start of a line
+    const headerPattern = new RegExp(`^${this.escapeRegex(sectionHeader)}\\s*$`, "m");
+    const match = text.match(headerPattern);
+    if (!match || match.index === undefined) return null;
 
-    const contentStart = headerIndex + sectionHeader.length;
-    const nextHeaderIndex = text.indexOf(nextHeaderPrefix, contentStart);
+    const contentStart = match.index + match[0].length;
 
-    if (nextHeaderIndex === -1) {
-      return text.slice(contentStart).trim();
+    // Find the next header of the same or higher level (fewer or equal #)
+    // e.g., for level 2 (##), match ## but not ###
+    const nextHeaderPattern = new RegExp(`^#{1,${headerLevel}}\\s`, "m");
+    const remainingText = text.slice(contentStart);
+    const nextMatch = remainingText.match(nextHeaderPattern);
+
+    if (!nextMatch || nextMatch.index === undefined) {
+      return remainingText.trim();
     }
 
-    return text.slice(contentStart, nextHeaderIndex).trim();
+    return remainingText.slice(0, nextMatch.index).trim();
+  }
+
+  /**
+   * Escape special regex characters in a string.
+   */
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  /**
+   * Get the appropriate conventional commit prefix based on issue labels.
+   */
+  private getCommitPrefix(labels: string[]): string {
+    const labelSet = new Set(labels.map((l) => l.toLowerCase()));
+
+    // Check for specific issue types
+    if (labelSet.has("bug") || labelSet.has("fix") || labelSet.has("bugfix")) {
+      return "fix";
+    }
+    if (labelSet.has("feature") || labelSet.has("enhancement")) {
+      return "feat";
+    }
+    if (labelSet.has("docs") || labelSet.has("documentation")) {
+      return "docs";
+    }
+    if (labelSet.has("refactor") || labelSet.has("refactoring")) {
+      return "refactor";
+    }
+    if (labelSet.has("test") || labelSet.has("testing")) {
+      return "test";
+    }
+    if (labelSet.has("style")) {
+      return "style";
+    }
+    if (labelSet.has("perf") || labelSet.has("performance")) {
+      return "perf";
+    }
+    if (labelSet.has("chore") || labelSet.has("maintenance")) {
+      return "chore";
+    }
+    if (labelSet.has("ci") || labelSet.has("build")) {
+      return "ci";
+    }
+
+    // Default to fix for backward compatibility
+    return "fix";
   }
 }

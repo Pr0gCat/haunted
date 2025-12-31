@@ -345,4 +345,299 @@ describe("Orchestrator", () => {
       );
     });
   });
+
+  describe("extractSection", () => {
+    // Helper to access private methods for testing
+    function getPrivateMethod<T>(instance: Orchestrator, methodName: string): T {
+      return (instance as unknown as Record<string, T>)[methodName] as T;
+    }
+
+    it("should extract section content between headers", () => {
+      const text = `## Summary
+This is the summary content.
+
+## Changes
+- Changed file A
+- Changed file B
+
+## Test Results
+All tests pass.`;
+
+      const extractSection = getPrivateMethod<(text: string, header: string, level?: number) => string | null>(
+        orchestrator,
+        "extractSection"
+      );
+      const result = extractSection.call(orchestrator, text, "## Summary");
+
+      expect(result).toBe("This is the summary content.");
+    });
+
+    it("should extract section until end of text when no next header", () => {
+      const text = `## Summary
+This is the only section.
+With multiple lines.`;
+
+      const extractSection = getPrivateMethod<(text: string, header: string, level?: number) => string | null>(
+        orchestrator,
+        "extractSection"
+      );
+      const result = extractSection.call(orchestrator, text, "## Summary");
+
+      expect(result).toBe("This is the only section.\nWith multiple lines.");
+    });
+
+    it("should return null when section not found", () => {
+      const text = `## Summary
+Some content`;
+
+      const extractSection = getPrivateMethod<(text: string, header: string, level?: number) => string | null>(
+        orchestrator,
+        "extractSection"
+      );
+      const result = extractSection.call(orchestrator, text, "## Changes");
+
+      expect(result).toBeNull();
+    });
+
+    it("should not match partial header matches", () => {
+      const text = `## Summary Extended
+This should not match ## Summary.
+
+## Summary
+This is the real summary.`;
+
+      const extractSection = getPrivateMethod<(text: string, header: string, level?: number) => string | null>(
+        orchestrator,
+        "extractSection"
+      );
+      const result = extractSection.call(orchestrator, text, "## Summary");
+
+      expect(result).toBe("This is the real summary.");
+    });
+
+    it("should handle ### subheaders within a ## section", () => {
+      const text = `## Summary
+Main content.
+
+### Subsection
+More details here.
+
+## Changes
+Changed files.`;
+
+      const extractSection = getPrivateMethod<(text: string, header: string, level?: number) => string | null>(
+        orchestrator,
+        "extractSection"
+      );
+      const result = extractSection.call(orchestrator, text, "## Summary");
+
+      expect(result).toBe("Main content.\n\n### Subsection\nMore details here.");
+    });
+
+    it("should handle empty section content", () => {
+      const text = `## Summary
+
+## Changes
+Changed files.`;
+
+      const extractSection = getPrivateMethod<(text: string, header: string, level?: number) => string | null>(
+        orchestrator,
+        "extractSection"
+      );
+      const result = extractSection.call(orchestrator, text, "## Summary");
+
+      expect(result).toBe("");
+    });
+  });
+
+  describe("formatPRDescription", () => {
+    function getPrivateMethod<T>(instance: Orchestrator, methodName: string): T {
+      return (instance as unknown as Record<string, T>)[methodName] as T;
+    }
+
+    it("should format PR with all sections from summary", () => {
+      const summary = `## Summary
+Fixed the bug in login.
+
+## Changes
+- Updated auth.ts
+
+## Test Results
+All 10 tests passing.`;
+
+      const formatPRDescription = getPrivateMethod<(summary: string, filesChanged: string[], issueNumber: number) => string>(
+        orchestrator,
+        "formatPRDescription"
+      );
+      const result = formatPRDescription.call(orchestrator, summary, ["auth.ts"], 42);
+
+      expect(result).toContain("## Summary");
+      expect(result).toContain("Fixed the bug in login.");
+      expect(result).toContain("## Changes");
+      expect(result).toContain("Updated auth.ts");
+      expect(result).toContain("## Test Results");
+      expect(result).toContain("All 10 tests passing.");
+      expect(result).toContain("Closes #42");
+    });
+
+    it("should use filesChanged when no Changes section in summary", () => {
+      const summary = "Fixed the login issue by updating authentication logic.";
+
+      const formatPRDescription = getPrivateMethod<(summary: string, filesChanged: string[], issueNumber: number) => string>(
+        orchestrator,
+        "formatPRDescription"
+      );
+      const result = formatPRDescription.call(orchestrator, summary, ["auth.ts", "login.ts"], 42);
+
+      expect(result).toContain("**auth.ts**");
+      expect(result).toContain("**login.ts**");
+    });
+
+    it("should handle empty filesChanged array", () => {
+      const summary = "Quick documentation update.";
+
+      const formatPRDescription = getPrivateMethod<(summary: string, filesChanged: string[], issueNumber: number) => string>(
+        orchestrator,
+        "formatPRDescription"
+      );
+      const result = formatPRDescription.call(orchestrator, summary, [], 42);
+
+      expect(result).toContain("## Summary");
+      expect(result).toContain("Closes #42");
+    });
+
+    it("should use entire summary when no Summary section header", () => {
+      const summary = "Just a plain text summary without headers.";
+
+      const formatPRDescription = getPrivateMethod<(summary: string, filesChanged: string[], issueNumber: number) => string>(
+        orchestrator,
+        "formatPRDescription"
+      );
+      const result = formatPRDescription.call(orchestrator, summary, [], 42);
+
+      expect(result).toContain("Just a plain text summary without headers.");
+    });
+  });
+
+  describe("getCommitPrefix", () => {
+    function getPrivateMethod<T>(instance: Orchestrator, methodName: string): T {
+      return (instance as unknown as Record<string, T>)[methodName] as T;
+    }
+
+    it("should return fix for bug labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["bug"])).toBe("fix");
+      expect(getCommitPrefix.call(orchestrator, ["Bug"])).toBe("fix");
+      expect(getCommitPrefix.call(orchestrator, ["bugfix"])).toBe("fix");
+      expect(getCommitPrefix.call(orchestrator, ["fix"])).toBe("fix");
+    });
+
+    it("should return feat for feature labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["feature"])).toBe("feat");
+      expect(getCommitPrefix.call(orchestrator, ["Feature"])).toBe("feat");
+      expect(getCommitPrefix.call(orchestrator, ["enhancement"])).toBe("feat");
+      expect(getCommitPrefix.call(orchestrator, ["Enhancement"])).toBe("feat");
+    });
+
+    it("should return docs for documentation labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["docs"])).toBe("docs");
+      expect(getCommitPrefix.call(orchestrator, ["documentation"])).toBe("docs");
+    });
+
+    it("should return refactor for refactoring labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["refactor"])).toBe("refactor");
+      expect(getCommitPrefix.call(orchestrator, ["refactoring"])).toBe("refactor");
+    });
+
+    it("should return test for test labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["test"])).toBe("test");
+      expect(getCommitPrefix.call(orchestrator, ["testing"])).toBe("test");
+    });
+
+    it("should return perf for performance labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["perf"])).toBe("perf");
+      expect(getCommitPrefix.call(orchestrator, ["performance"])).toBe("perf");
+    });
+
+    it("should return chore for maintenance labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["chore"])).toBe("chore");
+      expect(getCommitPrefix.call(orchestrator, ["maintenance"])).toBe("chore");
+    });
+
+    it("should return ci for CI/build labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["ci"])).toBe("ci");
+      expect(getCommitPrefix.call(orchestrator, ["build"])).toBe("ci");
+    });
+
+    it("should return style for style labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, ["style"])).toBe("style");
+    });
+
+    it("should default to fix for unknown labels", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      expect(getCommitPrefix.call(orchestrator, [])).toBe("fix");
+      expect(getCommitPrefix.call(orchestrator, ["unknown"])).toBe("fix");
+      expect(getCommitPrefix.call(orchestrator, ["priority:high", "area:frontend"])).toBe("fix");
+    });
+
+    it("should handle multiple labels and return first matching prefix", () => {
+      const getCommitPrefix = getPrivateMethod<(labels: string[]) => string>(
+        orchestrator,
+        "getCommitPrefix"
+      );
+
+      // Bug takes precedence over feature
+      expect(getCommitPrefix.call(orchestrator, ["feature", "bug"])).toBe("fix");
+      // Feature takes precedence over docs
+      expect(getCommitPrefix.call(orchestrator, ["docs", "feature"])).toBe("feat");
+    });
+  });
 });
