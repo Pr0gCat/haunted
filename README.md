@@ -112,15 +112,17 @@ haunted issue list --status in_progress
 
 ## Workflow
 
-Haunted implements the development workflow from `docs/DEVELOPMENT_WORKFLOW.md`:
+Haunted implements a flexible development workflow (see `docs/DEVELOPMENT_WORKFLOW.md` for details):
 
-1. **Plan**: AI analyzes requirements and creates implementation strategy
-2. **Implement**: AI writes code following the plan
-3. **Unit Test**: AI creates and runs unit tests
-4. **Fix Issues**: AI fixes any test failures
-5. **Integration Test**: AI runs integration tests
-6. **Diagnose**: If integration tests fail, AI diagnoses and replans
-7. **Done**: Issue completed and merged
+1. **Plan (計劃)**: AI analyzes requirements and creates implementation strategy
+2. **Implement (實作)**: AI writes code following the plan
+3. **Unit Test (單元測試)**: AI creates and runs unit tests
+4. **Fix Issues (問題修復)**: AI fixes any test failures
+5. **Integration Test (整合測試)**: AI runs integration tests
+6. **Diagnose (診斷)**: If integration tests fail, AI diagnoses and replans
+7. **Done (完成)**: Issue completed and merged
+
+This workflow prioritizes implementation-first approach with multi-layer testing validation.
 
 ## Commands
 
@@ -128,7 +130,6 @@ Haunted implements the development workflow from `docs/DEVELOPMENT_WORKFLOW.md`:
 
 - `haunted init` - Initialize Haunted in current project
 - `haunted start` - Start the AI daemon
-- `haunted stop` - Stop the daemon
 - `haunted status` - Show current status
 
 ### Issue Management
@@ -137,6 +138,10 @@ Haunted implements the development workflow from `docs/DEVELOPMENT_WORKFLOW.md`:
 - `haunted issue list` - List all issues
 - `haunted issue show <id>` - Show issue details
 - `haunted issue comment <id> <message>` - Add comment to issue
+- `haunted issue approve <id>` - Approve issue plan
+- `haunted issue reject <id> [reason]` - Reject issue plan
+- `haunted issue open <id>` - Reopen closed issue
+- `haunted issue close <id>` - Close issue
 
 ### Phase Management
 
@@ -176,17 +181,22 @@ Configuration is stored in `.haunted/config.json`:
 
 ```
 src/
-├── cli/           # Command-line interface
+├── cli/           # Command-line interface entry point
 ├── commands/      # Individual command implementations
+│   ├── init.ts           # Project initialization
+│   ├── issue.ts          # Issue management commands
+│   ├── phase.ts          # Phase management commands
+│   ├── start.ts          # Daemon start command
+│   └── status.ts         # Status display command
 ├── services/      # Core business logic
 │   ├── claude-wrapper.ts # Claude Code CLI integration
 │   ├── workflow-engine.ts # Workflow engine
-│   ├── database.ts       # Database management
+│   ├── database.ts       # SQLite database management
 │   ├── git-manager.ts    # Git operations
 │   └── daemon.ts         # Background service
 ├── models/        # TypeScript data models
-├── mcp/           # MCP tools for Claude
-└── utils/         # Utilities and config
+├── mcp/           # MCP server for Claude integration
+└── utils/         # Utilities, config, and logging
 ```
 
 ## Development Workflow Integration
@@ -268,6 +278,38 @@ haunted issue comment abc123 "Please use bcrypt for password hashing"
 
 # Check all open issues
 haunted issue list --status open
+
+# Approve or reject AI's implementation plan
+haunted issue approve abc123
+haunted issue reject abc123 "Need more detailed error handling"
+
+# Manage issue lifecycle
+haunted issue close abc123
+haunted issue open abc123
+```
+
+## Development
+
+```bash
+# Clone and install dependencies
+git clone https://github.com/progcat/haunted.git
+cd haunted
+npm install
+
+# Build the project
+npm run build
+
+# Run in development mode
+npm run dev
+
+# Run tests
+npm test
+
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
 ```
 
 ## Contributing
@@ -275,7 +317,8 @@ haunted issue list --status open
 1. Fork the repository
 2. Create feature branch: `git checkout -b feature/name`
 3. Make changes and test
-4. Submit pull request
+4. Run `npm run lint` and `npm test` to ensure code quality
+5. Submit pull request
 
 ## License
 
