@@ -3,6 +3,8 @@ import { createHmac } from "node:crypto";
 import { createWebhookServer, verifySignature } from "./webhook-server.ts";
 import type { Config } from "@/config/schema.ts";
 
+type WebhookResponse = { error?: string; status?: string; timestamp?: string };
+
 // Mock logger
 vi.mock("@/utils/logger.ts", () => ({
   createLogger: () => ({
@@ -117,7 +119,7 @@ describe("webhook-server", () => {
         });
 
         expect(response.status).toBe(401);
-        const body = await response.json();
+        const body = (await response.json()) as WebhookResponse;
         expect(body.error).toBe("Missing signature");
         expect(mockHandler).not.toHaveBeenCalled();
       });
@@ -138,7 +140,7 @@ describe("webhook-server", () => {
         });
 
         expect(response.status).toBe(401);
-        const body = await response.json();
+        const body = (await response.json()) as WebhookResponse;
         expect(body.error).toBe("Invalid signature");
         expect(mockHandler).not.toHaveBeenCalled();
       });
@@ -160,7 +162,7 @@ describe("webhook-server", () => {
         });
 
         expect(response.status).toBe(200);
-        const body = await response.json();
+        const body = (await response.json()) as WebhookResponse;
         expect(body.status).toBe("accepted");
         expect(mockHandler).toHaveBeenCalledTimes(1);
       });
@@ -225,7 +227,7 @@ describe("webhook-server", () => {
         });
 
         expect(response.status).toBe(400);
-        const body = await response.json();
+        const body = (await response.json()) as WebhookResponse;
         expect(body.error).toBe("Missing event type");
       });
 
@@ -243,7 +245,7 @@ describe("webhook-server", () => {
         });
 
         expect(response.status).toBe(400);
-        const body = await response.json();
+        const body = (await response.json()) as WebhookResponse;
         expect(body.error).toBe("Invalid JSON");
       });
 
@@ -262,7 +264,7 @@ describe("webhook-server", () => {
         });
 
         expect(response.status).toBe(500);
-        const body = await response.json();
+        const body = (await response.json()) as WebhookResponse;
         expect(body.error).toBe("Processing failed");
       });
     });
@@ -276,7 +278,7 @@ describe("webhook-server", () => {
       const response = await app.request("/health");
 
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = (await response.json()) as WebhookResponse;
       expect(body.status).toBe("ok");
       expect(body.timestamp).toBeDefined();
     });
