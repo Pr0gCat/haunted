@@ -2,14 +2,41 @@
   "name": "haunted",
   "version": "1.0.0",
   "description": "GitHub AI DevOps tool - AI agents that haunt your repository",
+  "author": "Pr0gCat",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Pr0gCat/haunted.git"
+  },
+  "keywords": [
+    "github",
+    "ai",
+    "devops",
+    "automation",
+    "claude",
+    "agent"
+  ],
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "module": "src/index.ts",
   "type": "module",
-  "private": true,
+  "bin": {
+    "haunted": "./dist/index.js",
+    "haunted-manager": "./dist/manager.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "manager": "bun run src/manager/index.ts",
     "manager:dev": "bun run --watch src/manager/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun && bun build src/manager/index.ts --outfile dist/manager.js --target bun && node -e \"const fs=require('fs'); ['dist/index.js','dist/manager.js'].forEach(f=>{const c=fs.readFileSync(f,'utf8');fs.writeFileSync(f,'#!/usr/bin/env bun\\n'+c)})\"",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
