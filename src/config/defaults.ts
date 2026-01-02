@@ -45,6 +45,7 @@ export const DEFAULT_CONFIG: Omit<Config, "scope"> = {
       { name: "Review", status: "review" },
       { name: "Done", status: "done" },
     ],
+    driven: false,
   },
   labels: {
     human_only: "human-only",

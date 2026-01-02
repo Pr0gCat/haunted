@@ -5,6 +5,7 @@ import { ClaudeCodeAgentPool } from "@/agents/claude-code.ts";
 import { getIssue, getIssueComments, addIssueComment, addIssueLabels, updateIssue } from "@/github/issues.ts";
 import { createPullRequest, getPRDiff, addPRReview, getPullRequest } from "@/github/pull-requests.ts";
 import { formatAgentComment } from "@/github/comments.ts";
+import { ProjectService } from "@/github/projects.ts";
 
 const logger = createLogger("orchestrator");
 
@@ -56,6 +57,7 @@ export class Orchestrator {
   private claudeCodePool: ClaudeCodeAgentPool;
   private repoPath: string;
   private processingIssues: Set<string> = new Set();
+  private projectService: ProjectService | null = null;
 
   constructor(config: Config, repoPath: string) {
     this.config = config;
@@ -64,11 +66,118 @@ export class Orchestrator {
     this.claudeCodePool = new ClaudeCodeAgentPool(config, repoPath, {
       maxWorkers: 3,
     });
+
+    // 初始化 ProjectService（如果啟用）
+    if (config.project.enabled && config.project.number) {
+      this.projectService = new ProjectService(config.scope.target, config.project.number);
+    }
   }
 
   async init(): Promise<void> {
     await this.claudeCodePool.init();
     logger.info("Orchestrator initialized");
+  }
+
+  /**
+   * 只分析 issue，不實作（Project 驅動模式用）
+   */
+  async analyzeIssue(task: IssueTask): Promise<void> {
+    logger.info({ repo: task.repo, number: task.number }, "Analyzing issue (no implementation)");
+
+    try {
+      const [issue, comments] = await Promise.all([
+        getIssue(task.repo, task.number),
+        getIssueComments(task.repo, task.number),
+      ]);
+
+      const analysis = await this.houseMaster.analyzeIssue(issue, this.repoPath, comments);
+
+      logger.info({ issueNumber: task.number, analysis }, "Issue analysis complete");
+
+      // 加 labels
+      if (analysis.suggestedLabels.length > 0) {
+        try {
+          await addIssueLabels(task.repo, task.number, analysis.suggestedLabels);
+        } catch (error) {
+          logger.warn({ error }, "Failed to add labels");
+        }
+      }
+
+      // 如果需要澄清，發評論
+      if (analysis.needsClarification && analysis.clarificationQuestion) {
+        await addIssueComment(
+          task.repo,
+          task.number,
+          formatAgentComment(
+            "HouseMaster",
+            `I need some clarification before this can be scheduled:\n\n${analysis.clarificationQuestion}`
+          )
+        );
+      }
+    } catch (error) {
+      logger.error({ error, repo: task.repo, number: task.number }, "Failed to analyze issue");
+    }
+  }
+
+  /**
+   * 執行排程任務（從 Project Board 來的）
+   */
+  async executeScheduledTask(task: IssueTask): Promise<void> {
+    const issueKey = `${task.repo}:${task.number}`;
+
+    if (this.processingIssues.has(issueKey)) {
+      logger.warn({ issueKey }, "Issue already being processed");
+      return;
+    }
+
+    this.processingIssues.add(issueKey);
+
+    try {
+      logger.info({ repo: task.repo, number: task.number }, "Executing scheduled task");
+
+      const issue = await getIssue(task.repo, task.number);
+
+      // 更新 Project 狀態
+      if (this.projectService) {
+        await this.projectService.markInProgress(task.repo, task.number, task.labels);
+      }
+
+      // 直接執行，不再分析
+      const result = await this.claudeCodePool.executeTask(issue, task.repo);
+
+      if (!result.success) {
+        await addIssueComment(
+          task.repo,
+          task.number,
+          formatAgentComment(
+            "Haunted",
+            `Implementation failed: ${result.error || "Unknown error"}\n\nA human developer may need to take a look.`
+          )
+        );
+        return;
+      }
+
+      const prBody = this.formatPRDescription(result.summary, result.filesChanged, issue.number);
+      const pr = await createPullRequest({
+        repo: task.repo,
+        title: `fix: ${issue.title}`,
+        body: prBody,
+        head: result.branchName,
+        base: "main",
+      });
+
+      await addIssueComment(
+        task.repo,
+        task.number,
+        formatAgentComment("Haunted", `Created PR #${pr.number}`)
+      );
+
+      logger.info({ repo: task.repo, issueNumber: task.number, prNumber: pr.number }, "Scheduled task completed");
+    } catch (error) {
+      logger.error({ error, issueKey }, "Failed to execute scheduled task");
+    } finally {
+      this.processingIssues.delete(issueKey);
+    }
   }
 
   async processIssue(task: IssueTask): Promise<void> {
@@ -131,6 +240,15 @@ export class Orchestrator {
       // Log subtask split but don't spam comments
       if (analysis.shouldSplit && analysis.subtasks.length > 0) {
         logger.info({ issueNumber: task.number, subtasks: analysis.subtasks }, "Issue should be split");
+      }
+
+      // 更新 Project Board 狀態為 In Progress
+      if (this.projectService) {
+        try {
+          await this.projectService.markInProgress(task.repo, task.number, task.labels);
+        } catch (error) {
+          logger.error({ error, issueNumber: task.number }, "Failed to mark issue as In Progress in project");
+        }
       }
 
       // Decide whether to create PR or commit directly to main based on requiresPR

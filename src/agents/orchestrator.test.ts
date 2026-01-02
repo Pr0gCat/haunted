@@ -85,6 +85,7 @@ describe("Orchestrator", () => {
         { name: "Review", status: "review" },
         { name: "Done", status: "done" },
       ],
+      driven: false,
     },
     labels: {
       human_only: "human-only",

@@ -163,11 +163,13 @@ export const ProjectConfigSchema = z
     enabled: z.boolean().optional(),
     number: z.number().optional().describe("GitHub Project number to use"),
     columns: z.array(ProjectColumnSchema).optional(),
+    driven: z.boolean().optional().describe("Project-driven mode: only process issues scheduled in project board"),
   })
   .transform((val) => ({
     enabled: val.enabled ?? true,
     number: val.number,
     columns: val.columns ?? DEFAULT_COLUMNS,
+    driven: val.driven ?? false,
   }));
 
 // Issue category label definition
@@ -289,6 +291,7 @@ export const ConfigSchema = z
         enabled: z.boolean().optional(),
         number: z.number().optional(),
         columns: z.array(ProjectColumnSchema).optional(),
+        driven: z.boolean().optional(),
       })
       .optional(),
     labels: z
@@ -342,6 +345,7 @@ export const ConfigSchema = z
       enabled: val.project?.enabled ?? true,
       number: val.project?.number,
       columns: val.project?.columns ?? DEFAULT_COLUMNS,
+      driven: val.project?.driven ?? false,
     },
     labels: {
       human_only: val.labels?.human_only ?? "human-only",

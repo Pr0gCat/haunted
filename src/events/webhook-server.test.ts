@@ -40,7 +40,7 @@ describe("webhook-server", () => {
       auto_merge: { enabled: false, require_approval: true, require_ci_pass: true },
       rules: [],
     },
-    project: { enabled: false, number: undefined, columns: [] },
+    project: { enabled: false, number: undefined, columns: [], driven: false },
     labels: {
       human_only: "human-only",
       skip: "haunted-skip",

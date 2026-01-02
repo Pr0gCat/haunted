@@ -10,6 +10,8 @@ import { createPRHandlers } from "@/events/handlers/pull-request.ts";
 import { createCommentHandlers } from "@/events/handlers/comment.ts";
 import { checkGhAuth, getGhUser } from "@/github/cli.ts";
 import { ensureLabels, type LabelDefinition } from "@/github/issues.ts";
+import { ProjectWatcher } from "@/project/watcher.ts";
+import { getIssue } from "@/github/issues.ts";
 
 const logger = createLogger("main");
 
@@ -107,6 +109,41 @@ async function main() {
     poller.start();
   }
 
+  // Project 驅動模式：啟動 ProjectWatcher
+  let projectWatcherInterval: ReturnType<typeof setInterval> | null = null;
+  if (config.project.enabled && config.project.driven && config.project.number) {
+    const projectWatcher = new ProjectWatcher(config);
+    const pollInterval = config.github.polling.interval * 1000;
+
+    const checkScheduledTasks = async () => {
+      try {
+        const tasks = await projectWatcher.getScheduledTasks();
+        if (tasks.length > 0) {
+          logger.info({ count: tasks.length }, "Found scheduled tasks in Project Board");
+
+          for (const task of tasks) {
+            const issue = await getIssue(task.repo, task.issueNumber);
+            await orchestrator.executeScheduledTask({
+              repo: task.repo,
+              number: task.issueNumber,
+              title: task.title,
+              body: issue.body,
+              labels: issue.labels,
+              author: issue.author,
+            });
+          }
+        }
+      } catch (error) {
+        logger.error({ error }, "Failed to check scheduled tasks");
+      }
+    };
+
+    // 立即執行一次，然後定期輪詢
+    checkScheduledTasks();
+    projectWatcherInterval = setInterval(checkScheduledTasks, pollInterval);
+    logger.info({ interval: pollInterval }, "Project-driven mode enabled, watching for scheduled tasks");
+  }
+
   logger.info("🏚️ Haunted is now watching your repository...");
 
   const shutdown = async () => {
@@ -114,6 +151,10 @@ async function main() {
 
     if (poller) {
       poller.stop();
+    }
+
+    if (projectWatcherInterval) {
+      clearInterval(projectWatcherInterval);
     }
 
     await orchestrator.cleanup();
