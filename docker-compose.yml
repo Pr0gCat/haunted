@@ -27,5 +27,38 @@ services:
       timeout: 10s
       retries: 3
 
+  # Multi-instance manager service
+  manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.manager
+    container_name: haunted-manager
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount manager configuration
+      - ./manager.yaml:/app/manager.yaml:ro
+      # Mount instance configurations
+      - ./instances:/app/instances:ro
+      # Mount repositories for instances
+      - ${REPOS_PATH:-./repos}:/repos:rw
+      # Mount Claude Code authentication
+      - ~/.claude:/root/.claude:ro
+      # Mount GitHub CLI authentication
+      - ~/.config/gh:/root/.config/gh:ro
+      # Persist worktrees across restarts
+      - haunted-worktrees:/tmp/haunted-worktrees
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - manager
+
 volumes:
   haunted-worktrees:

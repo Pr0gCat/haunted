@@ -1,0 +1,38 @@
+# Haunted Manager - Multi-instance management service
+FROM oven/bun:1.2-alpine
+
+# Install dependencies
+RUN apk add --no-cache \
+    git \
+    github-cli \
+    nodejs \
+    npm \
+    curl
+
+# Install Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json bun.lock ./
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Create directories
+RUN mkdir -p /tmp/haunted-worktrees /app/instances
+
+# Expose manager API port
+EXPOSE 8080
+
+# Health check for manager API
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Start the manager
+CMD ["bun", "run", "manager"]
