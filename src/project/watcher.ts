@@ -181,6 +181,7 @@ export class ProjectWatcher {
     const data = JSON.parse(result.stdout);
     const items = data.data?.organization?.projectV2?.items?.nodes ?? [];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return items.map((item: any) => {
       const fields: Record<string, string | null> = {};
 
@@ -198,7 +199,7 @@ export class ProjectWatcher {
       }
 
       const content = item.content;
-      const isIssue = content?.repository !== undefined && !content?.isDraft;
+      const repository = content?.repository as { nameWithOwner?: string } | undefined;
 
       return {
         id: item.id,
@@ -211,7 +212,7 @@ export class ProjectWatcher {
         content: content
           ? {
               number: content.number,
-              repository: content.repository?.nameWithOwner ?? "",
+              repository: repository?.nameWithOwner ?? "",
               type: content.__typename === "PullRequest" ? "PullRequest" : "Issue",
             }
           : null,

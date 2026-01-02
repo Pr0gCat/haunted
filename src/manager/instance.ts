@@ -1,3 +1,4 @@
+/* global ReadableStream, TextDecoder */
 import { spawn, type Subprocess } from "bun";
 import { EventEmitter } from "events";
 import { createLogger } from "@/utils/logger.ts";
