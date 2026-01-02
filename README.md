@@ -1,4 +1,4 @@
-# 🏚️ Haunted
+# 👻 Haunted
 
 > AI DevOps tool that haunts your GitHub repository
 
@@ -130,6 +130,91 @@ docker-compose up -d
 
 在評論中 `@haunted` 可以與 House Master 互動。
 
+## Multi-Instance Manager
+
+Haunted 提供 Manager 服務，可以同時管理多個 haunted instance。
+
+### 配置
+
+```bash
+# 複製範例配置
+cp manager.yaml.example manager.yaml
+```
+
+編輯 `manager.yaml`：
+
+```yaml
+version: "1.0"
+
+manager:
+  api:
+    port: 8080
+    host: "0.0.0.0"
+  supervisor:
+    auto_restart: true
+    max_restarts: 3
+
+instances:
+  - id: "org-main"
+    name: "Main Organization"
+    enabled: true
+    config_file: "./instances/org.yaml"
+    working_dir: "/path/to/org/repo"
+    env:
+      GITHUB_TOKEN: "${ORG_GITHUB_TOKEN}"
+
+  - id: "my-repo"
+    name: "Personal Repo"
+    enabled: true
+    config:
+      scope:
+        type: "repo"
+        target: "username/repo"
+      github:
+        webhook:
+          port: 3001
+    working_dir: "/path/to/repo"
+```
+
+### 執行
+
+```bash
+# 開發模式
+bun run manager:dev
+
+# 生產模式
+bun run manager
+```
+
+### HTTP API
+
+Manager 提供 HTTP API 來管理 instances：
+
+| Method | Endpoint | 說明 |
+|--------|----------|------|
+| GET | `/health` | 健康檢查 |
+| GET | `/api/instances` | 列出所有 instances |
+| GET | `/api/instances/:id` | 取得 instance 狀態 |
+| POST | `/api/instances/:id/start` | 啟動 instance |
+| POST | `/api/instances/:id/stop` | 停止 instance |
+| POST | `/api/instances/:id/restart` | 重啟 instance |
+| GET | `/api/instances/:id/logs` | 取得日誌 |
+| GET | `/api/instances/:id/logs/stream` | SSE 即時日誌 |
+| GET | `/api/metrics` | 全局監控指標 |
+
+範例：
+
+```bash
+# 查看所有 instances
+curl http://localhost:8080/api/instances
+
+# 重啟特定 instance
+curl -X POST http://localhost:8080/api/instances/my-repo/restart
+
+# 取得最新 50 行日誌
+curl "http://localhost:8080/api/instances/my-repo/logs?limit=50"
+```
+
 ## 架構
 
 ```
@@ -150,6 +235,22 @@ docker-compose up -d
                 │ Claude Code   │◄── Claude Code CLI
                 │   Workers     │    + Git Worktrees
                 └───────────────┘
+```
+
+### Manager 架構
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  Haunted Manager                     │
+│  ┌──────────┐  ┌────────────┐  ┌────────────────┐  │
+│  │ HTTP API │  │ Supervisor │  │ MetricsCollector│  │
+│  └──────────┘  └────────────┘  └────────────────┘  │
+├─────────────────────────────────────────────────────┤
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐       │
+│  │ Instance  │  │ Instance  │  │ Instance  │  ...  │
+│  │ (子進程)   │  │ (子進程)   │  │ (子進程)   │       │
+│  └───────────┘  └───────────┘  └───────────┘       │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## 開發
