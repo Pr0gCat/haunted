@@ -184,6 +184,8 @@ haunted.yaml
 haunted.yml
 .haunted.yaml
 .haunted.yml
+manager.yaml
+.manager.yaml
 
 # Build output
 dist/
