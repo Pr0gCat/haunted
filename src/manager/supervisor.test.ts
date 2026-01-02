@@ -56,7 +56,7 @@ describe("manager/supervisor", () => {
 
         const states = supervisor.getAllStates();
         expect(states).toHaveLength(1);
-        expect(states[0].id).toBe("test-1");
+        expect(states[0]!.id).toBe("test-1");
       });
 
       it("should throw when adding duplicate instance", async () => {

@@ -65,7 +65,7 @@ describe("manager/config-schema", () => {
       expect(result.manager.supervisor.auto_restart).toBe(false);
       expect(result.manager.supervisor.max_restarts).toBe(5);
       expect(result.instances).toHaveLength(1);
-      expect(result.instances[0].id).toBe("test-instance");
+      expect(result.instances[0]!.id).toBe("test-instance");
     });
 
     it("should parse instance with inline config", () => {
@@ -91,8 +91,8 @@ describe("manager/config-schema", () => {
 
       const result = ManagerFullConfigSchema.parse(config);
 
-      expect(result.instances[0].config?.scope.type).toBe("repo");
-      expect(result.instances[0].config?.scope.target).toBe("owner/repo");
+      expect(result.instances[0]!.config?.scope.type).toBe("repo");
+      expect(result.instances[0]!.config?.scope.target).toBe("owner/repo");
     });
 
     it("should parse instance with config_file", () => {
@@ -109,8 +109,8 @@ describe("manager/config-schema", () => {
 
       const result = ManagerFullConfigSchema.parse(config);
 
-      expect(result.instances[0].config_file).toBe("./instances/external.yaml");
-      expect(result.instances[0].working_dir).toBe("/path/to/repo");
+      expect(result.instances[0]!.config_file).toBe("./instances/external.yaml");
+      expect(result.instances[0]!.working_dir).toBe("/path/to/repo");
     });
 
     it("should parse instance with env vars", () => {
@@ -129,8 +129,8 @@ describe("manager/config-schema", () => {
 
       const result = ManagerFullConfigSchema.parse(config);
 
-      expect(result.instances[0].env?.GITHUB_TOKEN).toBe("token123");
-      expect(result.instances[0].env?.LOG_LEVEL).toBe("debug");
+      expect(result.instances[0]!.env?.GITHUB_TOKEN).toBe("token123");
+      expect(result.instances[0]!.env?.LOG_LEVEL).toBe("debug");
     });
 
     it("should default instance enabled to true", () => {
@@ -145,7 +145,7 @@ describe("manager/config-schema", () => {
 
       const result = ManagerFullConfigSchema.parse(config);
 
-      expect(result.instances[0].enabled).toBe(true);
+      expect(result.instances[0]!.enabled).toBe(true);
     });
 
     it("should reject invalid instance id", () => {
