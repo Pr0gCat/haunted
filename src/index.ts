@@ -13,7 +13,10 @@ import { ensureLabels, type LabelDefinition } from "@/github/issues.ts";
 import { ProjectWatcher } from "@/project/watcher.ts";
 import { getIssue } from "@/github/issues.ts";
 
-const logger = createLogger("main");
+// 支援 Manager 環境下的 instance ID 標識
+const instanceId = process.env.HAUNTED_INSTANCE_ID;
+const loggerName = instanceId ? `main:${instanceId}` : "main";
+const logger = createLogger(loggerName);
 
 async function initializeLabels(config: Config): Promise<void> {
   const repo = config.scope.type === "repo" ? config.scope.target : null;

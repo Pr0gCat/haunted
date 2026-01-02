@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
+    "manager": "bun run src/manager/index.ts",
+    "manager:dev": "bun run --watch src/manager/index.ts",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

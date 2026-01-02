@@ -1,0 +1,71 @@
+# Haunted Manager Configuration Example
+# Copy this file to manager.yaml and customize for your setup
+
+version: "1.0"
+
+manager:
+  # HTTP API 設定
+  api:
+    port: 8080
+    host: "0.0.0.0"
+    # API 認證（可選）
+    auth:
+      enabled: false
+      api_key: "${MANAGER_API_KEY}"
+
+  # 日誌設定
+  logging:
+    level: "info"
+    # 每個 instance 的日誌保留行數
+    buffer_size: 1000
+
+  # 監控指標設定
+  metrics:
+    enabled: true
+    # 指標收集間隔（秒）
+    collect_interval: 30
+
+  # 進程管理設定
+  supervisor:
+    # 自動重啟崩潰的 instance
+    auto_restart: true
+    # 在 restart_window 時間內最大重啟次數
+    max_restarts: 3
+    # 重啟計數窗口（分鐘）
+    restart_window: 5
+    # 健康檢查間隔（秒）
+    health_check_interval: 60
+
+# Instance 定義
+instances:
+  # 範例 1：使用外部配置檔
+  - id: "my-org"
+    name: "My Organization"
+    enabled: true
+    config_file: "./instances/my-org.yaml"
+    working_dir: "/path/to/org/repo"
+    env:
+      GITHUB_TOKEN: "${MY_ORG_GITHUB_TOKEN}"
+
+  # 範例 2：使用內聯配置
+  - id: "personal-repo"
+    name: "Personal Repository"
+    enabled: true
+    config:
+      scope:
+        type: "repo"
+        target: "username/my-repo"
+      github:
+        webhook:
+          enabled: true
+          port: 3001  # 每個 instance 需要不同的 port
+        polling:
+          enabled: false
+    working_dir: "/path/to/my-repo"
+
+  # 範例 3：暫時停用的 instance
+  - id: "company-org"
+    name: "Company Organization"
+    enabled: false
+    config_file: "./instances/company.yaml"
+    working_dir: "/path/to/company/repo"

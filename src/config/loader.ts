@@ -39,7 +39,9 @@ async function findConfigFile(basePath: string): Promise<string | null> {
 }
 
 export async function loadConfig(basePath: string = process.cwd()): Promise<Config> {
-  const configPath = await findConfigFile(basePath);
+  // 支援環境變數覆蓋配置路徑
+  const envConfigPath = process.env.HAUNTED_CONFIG_PATH;
+  const configPath = envConfigPath ?? (await findConfigFile(basePath));
 
   if (!configPath) {
     throw new Error(
