@@ -1,33 +1,7 @@
-version: "3.8"
+# Haunted Manager - Multi-instance management service
+# For standalone haunted, use: ./scripts/docker-run.sh
 
 services:
-  haunted:
-    build: .
-    container_name: haunted
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    volumes:
-      # Mount the target repository
-      - ${REPO_PATH:-.}:/repo:rw
-      # Mount Claude Code authentication
-      - ~/.claude:/root/.claude:ro
-      # Mount GitHub CLI authentication
-      - ~/.config/gh:/root/.config/gh:ro
-      # Persist worktrees across restarts
-      - haunted-worktrees:/tmp/haunted-worktrees
-    environment:
-      - NODE_ENV=production
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
-    working_dir: /repo
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Multi-instance manager service
   manager:
     build:
       context: .
@@ -57,8 +31,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    profiles:
-      - manager
 
 volumes:
   haunted-worktrees:
