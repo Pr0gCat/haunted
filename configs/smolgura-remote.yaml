@@ -1,0 +1,41 @@
+# Haunted Configuration for smolGura on GPU Server (zenith.nb.fcuai)
+# Copy this to ~/Desktop/haunted/haunted.yaml on the remote server
+
+version: "1.0"
+
+scope:
+  type: "organization"
+  target: "smolgura"
+
+github:
+  webhook:
+    enabled: false  # Can enable later with proper port forwarding
+  polling:
+    enabled: true
+    interval: 30  # Check every 30 seconds
+
+agents:
+  house_master:
+    enabled: true
+    auto_assign: true
+    auto_review: true
+  claude_code:
+    enabled: true
+    branch_prefix: "haunted/"
+    auto_test: true
+    # Worker pool: adjust based on GPU availability
+    # More workers = more parallel tasks, but may conflict on GPU
+
+pull_requests:
+  auto_merge:
+    enabled: false  # Require human approval for ML changes
+  rules:
+    - label: "auto-merge"
+      auto_merge: true
+    - label: "gpu-required"
+      auto_merge: false  # GPU tasks always need review
+
+project:
+  enabled: true
+  number: 4
+  driven: true  # Use Project board to schedule tasks

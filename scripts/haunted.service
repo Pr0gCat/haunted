@@ -1,0 +1,16 @@
+[Unit]
+Description=Haunted - GitHub AI DevOps Agent
+After=network.target
+
+[Service]
+Type=simple
+User=progcat
+WorkingDirectory=/home/progcat/Desktop/haunted
+ExecStart=/home/progcat/.bun/bin/bun run start
+Restart=always
+RestartSec=10
+Environment=LOG_LEVEL=info
+Environment=REPO_PATH=/home/progcat/Desktop/smolGura
+
+[Install]
+WantedBy=multi-user.target
