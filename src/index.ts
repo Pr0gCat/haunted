@@ -8,28 +8,18 @@ import { Orchestrator } from "@/agents/orchestrator.ts";
 import { createIssueHandlers } from "@/events/handlers/issue.ts";
 import { createPRHandlers } from "@/events/handlers/pull-request.ts";
 import { createCommentHandlers } from "@/events/handlers/comment.ts";
-import { checkGhAuth, getGhUser } from "@/github/cli.ts";
+import { checkGhAuth, getGhUser, gh } from "@/github/cli.ts";
 import { ensureLabels, type LabelDefinition } from "@/github/issues.ts";
 import { ProjectWatcher } from "@/project/watcher.ts";
 import { getIssue } from "@/github/issues.ts";
+import { listOrgRepos, checkProjectPermission } from "@/github/index.ts";
 
 // 支援 Manager 環境下的 instance ID 標識
 const instanceId = process.env.HAUNTED_INSTANCE_ID;
 const loggerName = instanceId ? `main:${instanceId}` : "main";
 const logger = createLogger(loggerName);
 
-async function initializeLabels(config: Config): Promise<void> {
-  const repo = config.scope.type === "repo" ? config.scope.target : null;
-  if (!repo) {
-    logger.debug("Skipping label initialization for organization scope");
-    return;
-  }
-
-  if (!config.labels.auto_label) {
-    logger.debug("Auto-labeling disabled, skipping label initialization");
-    return;
-  }
-
+function collectLabels(config: Config): LabelDefinition[] {
   const allLabels: LabelDefinition[] = [];
 
   // Collect all issue type labels
@@ -53,8 +43,42 @@ async function initializeLabels(config: Config): Promise<void> {
   allLabels.push({ name: config.labels.auto_merge, color: "0e8a16", description: "Auto-merge when checks pass" });
   allLabels.push({ name: config.labels.needs_review, color: "fbca04", description: "Needs human review" });
 
-  logger.info({ count: allLabels.length }, "Ensuring labels exist on repository");
-  await ensureLabels(repo, allLabels);
+  // Add commonly suggested labels
+  allLabels.push({ name: "ai-ready", color: "5319e7", description: "Ready for AI to implement" });
+  allLabels.push({ name: "good first issue", color: "7057ff", description: "Good for newcomers" });
+  allLabels.push({ name: "help wanted", color: "008672", description: "Extra attention is needed" });
+  allLabels.push({ name: "wontfix", color: "ffffff", description: "This will not be worked on" });
+  allLabels.push({ name: "duplicate", color: "cfd3d7", description: "This issue or PR already exists" });
+  allLabels.push({ name: "invalid", color: "e4e669", description: "This doesn't seem right" });
+
+  return allLabels;
+}
+
+async function initializeLabels(config: Config): Promise<void> {
+  if (!config.labels.auto_label) {
+    logger.debug("Auto-labeling disabled, skipping label initialization");
+    return;
+  }
+
+  const allLabels = collectLabels(config);
+
+  if (config.scope.type === "repo") {
+    logger.info({ repo: config.scope.target, count: allLabels.length }, "Ensuring labels exist on repository");
+    await ensureLabels(config.scope.target, allLabels);
+  } else {
+    // Organization scope - ensure labels on all repos
+    const repos = await listOrgRepos(config.scope.target);
+    logger.info({ org: config.scope.target, repoCount: repos.length, labelCount: allLabels.length }, "Ensuring labels exist on organization repos");
+
+    for (const repo of repos) {
+      try {
+        await ensureLabels(repo, allLabels);
+        logger.debug({ repo }, "Labels ensured");
+      } catch (error) {
+        logger.warn({ repo, error }, "Failed to ensure labels on repo");
+      }
+    }
+  }
 }
 
 async function main() {
@@ -79,7 +103,8 @@ async function main() {
   // Ensure all configured labels exist on the repository
   await initializeLabels(config);
 
-  const repoPath = process.cwd();
+  const repoPath = process.env.REPO_PATH || process.cwd();
+  logger.info({ repoPath }, "Using repository path");
 
   const orchestrator = new Orchestrator(config, repoPath);
   await orchestrator.init();
@@ -115,36 +140,46 @@ async function main() {
   // Project 驅動模式：啟動 ProjectWatcher
   let projectWatcherInterval: ReturnType<typeof setInterval> | null = null;
   if (config.project.enabled && config.project.driven && config.project.number) {
-    const projectWatcher = new ProjectWatcher(config);
-    const pollInterval = config.github.polling.interval * 1000;
+    // Check if we have project permission first
+    const hasProjectPermission = await checkProjectPermission(config.scope.target, config.project.number);
 
-    const checkScheduledTasks = async () => {
-      try {
-        const tasks = await projectWatcher.getScheduledTasks();
-        if (tasks.length > 0) {
-          logger.info({ count: tasks.length }, "Found scheduled tasks in Project Board");
+    if (!hasProjectPermission) {
+      logger.warn(
+        { owner: config.scope.target, projectNumber: config.project.number },
+        "Missing 'read:project' permission. Project-driven mode disabled. Run 'gh auth refresh -s read:project' to enable."
+      );
+    } else {
+      const projectWatcher = new ProjectWatcher(config);
+      const pollInterval = config.github.polling.interval * 1000;
 
-          for (const task of tasks) {
-            const issue = await getIssue(task.repo, task.issueNumber);
-            await orchestrator.executeScheduledTask({
-              repo: task.repo,
-              number: task.issueNumber,
-              title: task.title,
-              body: issue.body,
-              labels: issue.labels,
-              author: issue.author,
-            });
+      const checkScheduledTasks = async () => {
+        try {
+          const tasks = await projectWatcher.getScheduledTasks();
+          if (tasks.length > 0) {
+            logger.info({ count: tasks.length }, "Found scheduled tasks in Project Board");
+
+            for (const task of tasks) {
+              const issue = await getIssue(task.repo, task.issueNumber);
+              await orchestrator.executeScheduledTask({
+                repo: task.repo,
+                number: task.issueNumber,
+                title: task.title,
+                body: issue.body,
+                labels: issue.labels,
+                author: issue.author,
+              });
+            }
           }
+        } catch (error) {
+          logger.error({ error }, "Failed to check scheduled tasks");
         }
-      } catch (error) {
-        logger.error({ error }, "Failed to check scheduled tasks");
-      }
-    };
+      };
 
-    // 立即執行一次，然後定期輪詢
-    checkScheduledTasks();
-    projectWatcherInterval = setInterval(checkScheduledTasks, pollInterval);
-    logger.info({ interval: pollInterval }, "Project-driven mode enabled, watching for scheduled tasks");
+      // 立即執行一次，然後定期輪詢
+      checkScheduledTasks();
+      projectWatcherInterval = setInterval(checkScheduledTasks, pollInterval);
+      logger.info({ interval: pollInterval }, "Project-driven mode enabled, watching for scheduled tasks");
+    }
   }
 
   logger.info("🏚️ Haunted is now watching your repository...");
